@@ -41,6 +41,17 @@ Fusing them gives narrow vowel quality, long-tail coverage, *and* variant captur
 
 The pipeline in `corpus/` is reproducible — fetch the four source files, run `corpus/build.py`, get the exact `data/openepd.json` we ship. Details (ARPABET → IPA mapping, Misaki near-IPA expansion, WikiPron narrow-form stripping) live in [`corpus/README.md`](corpus/README.md).
 
+## Interactive explorer
+
+`site-gen` (a non-published workspace member) renders `data/openepd.json` into a static educational site that lets a non-linguist type any word and see its phonemes annotated. The CI deploys it to [GitHub Pages](https://jackdanger.github.io/open-english-pronouncing-dictionary/) on every push to main.
+
+Run it locally:
+
+```bash
+cargo run --release -p site-gen -- data/openepd.json _site
+open _site/index.html
+```
+
 ## Using it
 
 ### From Rust

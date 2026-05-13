@@ -1,3 +1,9 @@
+[workspace]
+# `site-gen` is a private build tool (it renders the GitHub Pages
+# explorer from data/openepd.json). It is `publish = false` so it
+# never goes to crates.io alongside the dictionary itself.
+members = ["site-gen"]
+
 [package]
 name = "open-english-pronouncing-dictionary"
 description = "OpenEPD: open, fused English IPA pronunciation dictionary (~280k US English words). Misaki + CMUdict + WikiPron, canonical IPA with provenance and frequency-derived rarity. CC-BY-SA 4.0."

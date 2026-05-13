@@ -1,0 +1,54 @@
+name: Deploy GitHub Pages
+
+# Runs on every push to main (so the site rebuilds whenever the
+# corpus or the renderer changes) and can be triggered manually.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deployment at a time; cancel any in-flight run when a new push
+# arrives.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write   # required for OIDC Pages deployment
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Cache Rust artefacts so site-gen rebuilds in seconds after the
+      # first warmup (cold build is 2-3 min, warm is ~20 s).
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build site-gen
+        run: cargo build --release -p site-gen
+
+      - name: Generate site
+        # site-gen reads the corpus that ships in this very repo —
+        # no cross-repo fetch needed.
+        run: |
+          mkdir -p _site
+          target/release/site-gen data/openepd.json _site
+
+      - name: Upload Pages artefact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
