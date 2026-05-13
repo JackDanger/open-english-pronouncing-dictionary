@@ -1,0 +1,43 @@
+name: Release
+
+# Triggered by pushing a git tag of the form `v0.1.0`. Pre-release
+# tags (`v0.1.0-rc1`) build but don't publish.
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish-crates-io:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # `pipefail` is essential: cargo's exit code must survive the
+      # pipe to `tee`. Without it, `cargo failing | tee` exits 0 and
+      # the job silently passes even when nothing was uploaded.
+      - name: cargo publish
+        shell: bash -eo pipefail {0}
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            echo "Pre-release tag — running cargo publish --dry-run."
+            cargo publish --dry-run
+          else
+            # Write the publish log outside the crate dir so cargo
+            # doesn't see it as uncommitted state and refuse to
+            # publish.
+            LOG=$(mktemp)
+            if ! cargo publish --token "${CARGO_REGISTRY_TOKEN}" 2>&1 | tee "$LOG"; then
+              # cargo's "already published" wording has varied across
+              # versions. Match both spellings so rerun-after-success
+              # is idempotent without swallowing real errors.
+              if grep -qE "already.*uploaded|already exists on crates\.io" "$LOG"; then
+                echo "::warning::version already on crates.io — treating as success"
+                exit 0
+              fi
+              exit 1
+            fi
+          fi
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

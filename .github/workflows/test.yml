@@ -1,0 +1,31 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: cargo test + clippy + bench
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: cargo test
+        run: cargo test --release --no-fail-fast
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: corpus quality check
+        # bench.py is the Python-side regression suite. It walks the
+        # shipped data/openepd.json directly (no source-file refetch)
+        # so CI doesn't need network to verify the artifact.
+        run: |
+          python -m pip install --quiet wordfreq
+          python corpus/bench.py

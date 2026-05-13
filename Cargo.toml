@@ -1,0 +1,28 @@
+[package]
+name = "open-english-pronouncing-dictionary"
+description = "OpenEPD: open, fused English IPA pronunciation dictionary (~280k US English words). Misaki + CMUdict + WikiPron, canonical IPA with provenance and frequency-derived rarity. CC-BY-SA 4.0."
+version = "0.1.0"
+edition = "2021"
+license = "CC-BY-SA-4.0"
+authors = ["Jack Danger <github@jackdanger.com>"]
+repository = "https://github.com/JackDanger/open-english-pronouncing-dictionary"
+readme = "README.md"
+keywords = ["ipa", "phonetics", "pronunciation", "dictionary", "english"]
+categories = ["text-processing", "science", "internationalization"]
+# The embedded JSON is 28 MB — well over crates.io's default 10 MB
+# package-size guideline but inside the hard 64 MB cap. Listed
+# explicitly here because the data IS the artifact this crate ships.
+include = [
+    "src/**/*",
+    "data/openepd.json",
+    "README.md",
+    "LICENSE",
+    "corpus/README.md",
+]
+
+[dependencies]
+phonetics = { package = "phonetics-rs", version = "0.3", features = ["transcriptions"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
