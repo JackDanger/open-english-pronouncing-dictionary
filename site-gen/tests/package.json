@@ -1,0 +1,12 @@
+{
+  "name": "site-gen-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke": "node playwright-smoke.mjs ../../_site"
+  },
+  "dependencies": {
+    "playwright": "^1.50.0"
+  }
+}

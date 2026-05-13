@@ -44,6 +44,20 @@ jobs:
           mkdir -p _site
           target/release/site-gen data/openepd.json _site
 
+      # Click-through smoke test — fails the deploy if any handler
+      # throws or no-ops silently. The exact suite that would have
+      # caught the broken-onclick bug this whole refactor responded to.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright
+        working-directory: site-gen/tests
+        run: |
+          npm install --no-audit --no-fund --silent
+          npx --yes playwright install chromium --with-deps
+      - name: Playwright smoke
+        run: node site-gen/tests/playwright-smoke.mjs _site
+
       - name: Upload Pages artefact
         uses: actions/upload-pages-artifact@v3
         with:
