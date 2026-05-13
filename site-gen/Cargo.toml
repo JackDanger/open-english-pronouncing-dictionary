@@ -12,3 +12,18 @@ path = "src/main.rs"
 
 [dependencies]
 serde_json = "1"
+# Compile-time HTML construction with context-aware escaping. The
+# `html! { … }` macro escapes interpolated values for the surrounding
+# context (attribute vs element body vs URL) automatically, which
+# closes the class of bugs that mangled inline onclick handlers when
+# we hand-formatted HTML.
+maud = "0.27"
+# We use the per-phoneme distance metric to drive the phoneme-
+# distance visualizer. Build-time only — the resulting matrix ships
+# as embedded JSON, not as a runtime dependency.
+phonetics = { package = "phonetics-rs", version = "0.3" }
+
+[dev-dependencies]
+# Used in tests/ to parse the rendered output and assert structural
+# invariants (no inline onclick, every data-word resolves, etc.).
+scraper = "0.20"
