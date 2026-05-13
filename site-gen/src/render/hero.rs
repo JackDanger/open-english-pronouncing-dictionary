@@ -34,9 +34,7 @@ pub fn render(stats: &Stats) -> Markup {
             div class="hero-content" {
                 p class="hero-eyebrow" { "openepd · open english pronouncing dictionary" }
                 h1 class="hero-title serif" {
-                    "The English"
-                    br;
-                    "IPA Corpus"
+                    "The English IPA Corpus"
                 }
                 p class="hero-sub" {
                     (fmt_num(stats.total_words))

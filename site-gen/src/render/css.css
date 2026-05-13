@@ -47,13 +47,16 @@ body {
 .mono     { font-family: 'JetBrains Mono', 'Courier New', monospace; }
 .ipa-font { font-family: 'Noto Serif', 'Palatino Linotype', Georgia, serif; }
 
-/* ── Hero (preserved) ───────────────────────────────────────────────── */
+/* ── Hero (compact header strip) ────────────────────────────────────── */
+/* The workspace is the page's reason for existing. The hero used to
+ * fill 50svh — replaced with a slim header strip so the chart is
+ * visible on first paint. */
 #hero {
-  min-height: 50svh;
+  min-height: 0;
   background: linear-gradient(160deg, var(--b950) 0%, var(--b900) 45%, var(--b800) 100%);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   position: relative; overflow: hidden; text-align: center;
-  padding: 3rem 2rem 4rem;
+  padding: 1.25rem 2rem 1.5rem;
 }
 .hero-bg { position: absolute; inset: 0; pointer-events: none; overflow: hidden; user-select: none; }
 .hero-bg span {
@@ -69,41 +72,45 @@ body {
   60%  { transform: translateY(10px)  rotate(-3deg); opacity: .04; }
   100% { transform: translateY(0)    rotate(0deg);  opacity: .03; }
 }
-.hero-content  { position: relative; z-index: 1; max-width: 720px; }
-.hero-eyebrow  { font-family: 'JetBrains Mono', monospace; font-size: .78rem; letter-spacing: .25em; text-transform: uppercase; color: var(--b300); margin-bottom: 1.25rem; }
-.hero-title    { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(2.8rem, 9vw, 6rem); font-weight: 900; color: var(--cream); line-height: 1.04; letter-spacing: -.02em; margin-bottom: 1.25rem; }
-.hero-sub      { color: var(--b200); font-size: 1.05rem; max-width: 540px; margin: 0 auto 1.75rem; line-height: 1.7; }
-.hero-cta      { display: flex; gap: .75rem; flex-wrap: wrap; justify-content: center; }
+.hero-content  { position: relative; z-index: 1; max-width: 920px; }
+.hero-eyebrow  { font-family: 'JetBrains Mono', monospace; font-size: .68rem; letter-spacing: .22em; text-transform: uppercase; color: var(--b300); margin-bottom: .3rem; }
+.hero-title    { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(1.5rem, 3.5vw, 2.2rem); font-weight: 800; color: var(--cream); line-height: 1.1; letter-spacing: -.01em; margin-bottom: .35rem; }
+.hero-sub      { color: var(--b200); font-size: .82rem; max-width: 640px; margin: 0 auto .55rem; line-height: 1.55; }
+.hero-cta      { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; }
+.btn           { padding: .35rem 1rem; font-size: .78rem; }
 .btn { display: inline-block; padding: .6rem 1.35rem; border-radius: 2rem; font-size: .875rem; font-weight: 600; text-decoration: none; transition: all .2s; cursor: pointer; border: none; }
 .btn-primary { background: var(--cream); color: var(--b800); }
 .btn-primary:hover { background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,.22); }
 .btn-ghost { border: 1px solid var(--b400); color: var(--b200); background: transparent; }
 .btn-ghost:hover { background: rgba(255,255,255,.08); }
 
-/* ── Stats band ─────────────────────────────────────────────────────── */
-.stats-band { background: var(--b800); padding: 2rem 2rem; }
+/* ── Stats band (compact inline strip) ─────────────────────────────── */
+.stats-band { background: var(--b800); padding: .75rem 2rem; }
 .stats-inner {
-  max-width: 960px; margin: 0 auto;
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 1.25rem;
+  max-width: 1100px; margin: 0 auto;
+  display: flex; flex-wrap: wrap; gap: 1.25rem 2rem;
+  align-items: baseline; justify-content: center;
+  color: var(--b200);
 }
-.stat-card { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.10); border-radius: var(--radius); padding: 1.1rem; text-align: center; }
-.stat-num   { display: block; font-family: 'Playfair Display', serif; font-size: 2.0rem; font-weight: 700; color: #fff; line-height: 1; }
-.stat-label { display: block; font-size: .7rem; color: var(--b300); text-transform: uppercase; letter-spacing: .12em; margin-top: .35rem; }
+.stat-card { display: flex; align-items: baseline; gap: .45rem; background: none; border: 0; padding: 0; }
+.stat-num   { font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700; color: #fff; }
+.stat-label { font-size: .65rem; color: var(--b300); text-transform: uppercase; letter-spacing: .12em; }
 
 /* ── Workspace section ──────────────────────────────────────────────── */
-.workspace-section { background: #fff; padding: 4rem 2rem 3rem; }
+.workspace-section { background: #fff; padding: 1.25rem 2rem 2.5rem; }
 .workspace-inner   { max-width: 1300px; margin: 0 auto; }
 
-/* Word header: picker + display + hint, all in one band */
+/* Word header: picker + display in one tight row, hint underneath.
+ * The whole header collapses vertically so the chart can claim the
+ * viewport instead of sitting below the fold. */
 .word-header {
   display: grid;
-  grid-template-columns: minmax(0, 360px) 1fr;
-  gap: 2rem;
-  align-items: end;
+  grid-template-columns: minmax(0, 280px) 1fr;
+  gap: 1.5rem;
+  align-items: center;
   border-bottom: 1px solid var(--cream-d);
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
+  padding-bottom: .65rem;
+  margin-bottom: .5rem;
 }
 @media (max-width: 760px) { .word-header { grid-template-columns: 1fr; } }
 
@@ -153,28 +160,28 @@ body {
 .suggestion-none { padding: .55rem 1rem; color: #999; font-size: .85rem; }
 
 .word-display {
-  display: flex; align-items: baseline; flex-wrap: wrap; gap: .85rem 1.25rem;
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: .65rem 1rem;
 }
-.word-glyph { font-family: 'Playfair Display', serif; font-size: clamp(2.2rem, 5vw, 3.4rem); font-weight: 700; color: var(--b800); line-height: 1; }
-.word-ipa   { font-family: 'Noto Serif', serif; font-size: clamp(1.4rem, 3.5vw, 2.1rem); color: #6b5a5c; line-height: 1; }
-.word-rank  { font-size: .72rem; color: #b5959e; letter-spacing: .04em; }
+.word-glyph { font-family: 'Playfair Display', serif; font-size: clamp(1.8rem, 3.6vw, 2.4rem); font-weight: 700; color: var(--b800); line-height: 1; }
+.word-ipa   { font-family: 'Noto Serif', serif; font-size: clamp(1.1rem, 2.2vw, 1.5rem); color: #6b5a5c; line-height: 1; }
+.word-rank  { font-size: .7rem; color: #b5959e; letter-spacing: .04em; }
 .word-hint  {
   grid-column: 1 / -1;
-  font-size: .82rem;
+  font-size: .78rem;
   color: #6b5a5c;
   font-style: italic;
-  padding-top: .6rem;
+  padding-top: .4rem;
 }
 
 /* ── Spelling band ─────────────────────────────────────────────────── */
 .spelling-band-wrap {
   background: var(--cream);
   border-radius: var(--radius);
-  padding: .75rem 1rem .5rem;
-  margin-bottom: 1.25rem;
+  padding: .5rem .75rem .35rem;
+  margin-bottom: .65rem;
   border: 1px solid var(--cream-d);
 }
-#spelling-band { width: 100%; height: 80px; display: block; }
+#spelling-band { width: 100%; height: 56px; display: block; }
 .sb-letter {
   font-family: 'Playfair Display', serif; font-size: 4.5px;
   fill: var(--b800);
@@ -213,38 +220,94 @@ body {
   background: var(--cream);
   border: 1px solid var(--cream-d);
   border-radius: var(--radius);
-  padding: 1.25rem 1rem 1rem;
+  padding: .75rem .9rem .65rem;
 }
-.chart-title { font-size: 1rem; font-weight: 700; color: var(--b800); margin-bottom: .25rem; }
-.chart-sub   { font-size: .8rem; color: #6b5a5c; margin-bottom: .8rem; line-height: 1.55; }
+.chart-title { font-size: .9rem; font-weight: 700; color: var(--b800); margin-bottom: .15rem; }
+.chart-sub   { font-size: .75rem; color: #6b5a5c; margin-bottom: .55rem; line-height: 1.5; }
 .chart-viewport { width: 100%; }
 
 /* ── IPA chart SVG ─────────────────────────────────────────────────── */
-#ipa-chart { width: 100%; height: auto; max-height: 70svh; user-select: none; }
-.chart-bg .vowel-trap { fill: rgba(217,119,6,.05); stroke: rgba(217,119,6,.25); stroke-width: .25; }
-.chart-bg .cons-row.r0 { fill: rgba(0,0,0,.02); }
-.chart-bg .cons-row.r1 { fill: rgba(0,0,0,.045); }
-.chart-bg .axis-label  { font-size: 2.4px; fill: #9c8a8e; font-family: 'JetBrains Mono', monospace; letter-spacing: .15em; text-transform: uppercase; }
-.chart-bg .axis-label.rot { letter-spacing: .15em; }
-.chart-bg .row-label   { font-size: 2.6px; fill: #6b5a5c; font-family: 'JetBrains Mono', monospace; }
-.chart-bg .col-label   { font-size: 2.4px; fill: #6b5a5c; font-family: 'JetBrains Mono', monospace; }
+#ipa-chart {
+  width: 100%;
+  height: auto;
+  /* aspect ratio comes from viewBox; max-height anchors the chart to
+   * the viewport so it's a single coherent canvas rather than a
+   * scroll-required diagram. */
+  max-height: 62svh;
+  user-select: none;
+  display: block;
+}
+.chart-bg .vowel-trap   { fill: rgba(217,119,6,.04); stroke: rgba(217,119,6,.18); stroke-width: .2; }
+.chart-bg .cons-row.r0  { fill: rgba(0,0,0,.015); }
+.chart-bg .cons-row.r1  { fill: rgba(0,0,0,.028); }
+.chart-bg .axis-label   { font-size: 2.2px; fill: #b5959e; font-family: 'JetBrains Mono', monospace; letter-spacing: .18em; text-transform: uppercase; }
+.chart-bg .row-label    { font-size: 2.4px; fill: #8a7070; font-family: 'JetBrains Mono', monospace; }
+.chart-bg .col-label    { font-size: 2.2px; fill: #9c8a8e; font-family: 'JetBrains Mono', monospace; }
 
+/* Phoneme tiles. Four visual states matter:
+ *   default          — sitting quietly on the chart
+ *   :hover           — under the cursor (preview)
+ *   .on-path         — part of the currently-rendered word's path
+ *   .selected        — the user clicked it (commit, sticky)
+ * Each state composes; on-path + selected combine for a path
+ * phoneme the user has committed to. */
 .ph { cursor: pointer; }
 .ph .ph-bg {
   fill: #fff;
   stroke: var(--b300);
-  stroke-width: .25;
-  transition: stroke .15s, fill .15s, stroke-width .15s;
+  stroke-width: .3;
+  transition: stroke .15s, fill .15s, stroke-width .15s, transform .18s;
 }
 .ph .ph-glyph {
   font-family: 'Noto Serif', serif;
-  font-size: 4.6px;
+  font-size: 5.4px;
   fill: var(--b800);
   pointer-events: none;
+  transition: fill .15s, font-weight .15s;
 }
-.ph:hover .ph-bg { fill: var(--b100); stroke: var(--b500); stroke-width: .4; }
-.ph.active .ph-bg { fill: var(--b400); stroke: var(--b800); stroke-width: .5; }
-.ph.active .ph-glyph { fill: #fff; font-weight: 700; }
+
+/* :hover — subtle lift + brighter stroke. Doesn't fill the tile;
+   the user knows it's available without disturbing the chart. */
+.ph:hover .ph-bg {
+  fill: var(--b100);
+  stroke: var(--b600);
+  stroke-width: .55;
+  transform: scale(1.08);
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+/* .on-path — phoneme that participates in the current word's path.
+   Filled wine, white glyph; visible at a glance among ~50 neutral
+   tiles. */
+.ph.on-path .ph-bg {
+  fill: var(--b500);
+  stroke: var(--b800);
+  stroke-width: .4;
+}
+.ph.on-path .ph-glyph { fill: #fff; font-weight: 700; }
+
+/* .selected — strongest state. Filled deep wine, white glyph, gentle
+   outer halo. Stays put until the user commits to a different one,
+   or clicks the chart background. */
+.ph.selected .ph-bg {
+  fill: var(--b800);
+  stroke: var(--b800);
+  stroke-width: .6;
+  transform: scale(1.16);
+  transform-origin: center;
+  transform-box: fill-box;
+  filter: drop-shadow(0 0 .8px var(--b500));
+}
+.ph.selected .ph-glyph { fill: #fff; font-weight: 700; }
+
+/* Keyboard focus mirrors hover. */
+.ph:focus-visible { outline: none; }
+.ph:focus-visible .ph-bg {
+  stroke: var(--b800);
+  stroke-width: .8;
+  fill: var(--b200);
+}
 
 /* ── Word path overlay ─────────────────────────────────────────────── */
 .path-layer .word-path {
@@ -257,11 +320,19 @@ body {
   pointer-events: none;
   filter: drop-shadow(0 0 1px rgba(0,0,0,.18));
 }
+.path-stop {
+  cursor: pointer;
+  transition: transform .15s;
+  transform-box: fill-box;
+}
+.path-stop:hover { transform: scale(1.18); }
 .path-stop .stop-bg {
   fill: var(--b700);
   stroke: #fff;
-  stroke-width: .35;
+  stroke-width: .45;
+  transition: fill .15s;
 }
+.path-stop:hover .stop-bg { fill: var(--b500); }
 .path-stop .stop-n {
   font-family: 'JetBrains Mono', monospace;
   font-size: 2.6px;
