@@ -1,9 +1,9 @@
 //! Compose the full page from per-section render functions.
 //!
 //! `html_doc` is the only public entry point. Each section lives in
-//! its own module so the rendering surface area can be reasoned about
-//! piece by piece — and so the structural HTML tests can target one
-//! section at a time.
+//! its own module so the rendering surface area can be reasoned
+//! about piece by piece — and so the structural HTML tests can
+//! target one section at a time.
 
 use maud::{html, Markup, DOCTYPE};
 
@@ -12,18 +12,23 @@ use crate::distance_matrix::Matrix;
 use crate::minimal_pairs::MinimalPair;
 use crate::util::fmt_num;
 
+mod chart;
 mod css;
-mod hero;
-mod stats_band;
-mod search;
-mod phonemes;
-mod showcase;
-mod distance_viz;
-mod minimal_pairs;
-mod reverse_search;
-mod sources;
 mod footer;
+mod hero;
 mod scripts;
+mod showcase;
+mod sources;
+mod stats_band;
+mod workspace;
+
+// Retired but kept around to ease bisecting; they're no longer
+// composed into the page. Future cleanup commit will delete them.
+#[allow(dead_code)] mod distance_viz;
+#[allow(dead_code)] mod minimal_pairs;
+#[allow(dead_code)] mod phonemes;
+#[allow(dead_code)] mod reverse_search;
+#[allow(dead_code)] mod search;
 
 /// Build the entire static page as one HTML document.
 pub fn html_doc(
@@ -40,10 +45,10 @@ pub fn html_doc(
                 meta name="viewport" content="width=device-width, initial-scale=1.0";
                 title { "The English IPA Corpus — OpenEPD" }
                 meta name="description"
-                     content="An interactive phonetics explorer: type any English word to see its IPA breakdown, then click each sound to learn how it is made.";
+                     content="An interactive phonetics workspace: trace any English word's path through the IPA chart and watch a schematic vocal tract move with it.";
                 meta property="og:title" content="The English IPA Corpus — OpenEPD";
                 meta property="og:description"
-                     content=(format!("{} words · explore English phonetics interactively", total));
+                     content=(format!("{} words · trace any word through the anatomical IPA chart", total));
                 link rel="preconnect" href="https://fonts.googleapis.com";
                 link rel="preconnect" href="https://fonts.gstatic.com" crossorigin;
                 link rel="stylesheet"
@@ -52,12 +57,8 @@ pub fn html_doc(
             }
             body {
                 (hero::render(stats))
-                (search::render())
                 (stats_band::render(stats))
-                (phonemes::render(stats))
-                (distance_viz::render(matrix))
-                (minimal_pairs::render(pairs))
-                (reverse_search::render())
+                (workspace::render(stats))
                 (showcase::render(stats))
                 (sources::render(stats))
                 (footer::render())

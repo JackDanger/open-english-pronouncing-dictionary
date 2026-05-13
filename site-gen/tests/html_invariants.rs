@@ -121,6 +121,7 @@ fn data_word_values_resolve_in_words_payload() {
         checked += 1;
     }
     assert!(checked > 100, "expected >100 data-word elements, saw {checked}");
+    let _ = words;
 }
 
 #[test]
@@ -140,21 +141,59 @@ fn data_ch_values_resolve_in_phoneme_info() {
         );
         checked += 1;
     }
-    assert!(checked > 50, "expected >50 data-ch elements, saw {checked}");
+    // 47–55 is the natural range — every phoneme on the chart is
+    // a data-ch carrier, and the chart sizes match the corpus.
+    assert!(checked > 40, "expected >40 data-ch elements, saw {checked}");
 }
 
 #[test]
-fn heatmap_cells_match_matrix_dimensions() {
+fn chart_renders_real_phonemes() {
+    // The IPA chart should place every phoneme in the corpus that
+    // chart_layout knows a position for. Lower-bound the count so
+    // the test doesn't fail every time a phoneme is added.
     let html = build_site();
     let doc = Html::parse_document(&html);
-    let axis = extract_payload_as_array(&html, "PHONEME_AXIS");
-    let matrix = extract_payload_as_array(&html, "DISTANCE_MATRIX");
-    let n = axis.len();
-    assert_eq!(matrix.len(), n * n, "DISTANCE_MATRIX size mismatch");
+    let sel = Selector::parse("#ipa-chart .ph[data-ch]").unwrap();
+    let count = doc.select(&sel).count();
+    assert!(count > 40, "expected > 40 phonemes on chart, got {count}");
+    // Spot-check the chart has the workhorses.
+    for ch in ['p', 'b', 'm', 't', 'k', 's', 'ʃ', 'n', 'l', 'ɹ',
+               'i', 'ɪ', 'ɛ', 'æ', 'ʌ', 'u', 'ʊ', 'ɔ', 'ə'] {
+        let s = format!("#ipa-chart .ph[data-ch=\"{}\"]", ch);
+        let s = Selector::parse(&s).unwrap();
+        assert!(
+            doc.select(&s).next().is_some(),
+            "expected phoneme {ch} on chart"
+        );
+    }
+}
 
-    let cells = Selector::parse(".heatmap-cell[data-row][data-col]").unwrap();
-    let count = doc.select(&cells).count();
-    assert_eq!(count, n * n, "rendered heatmap-cell count mismatch");
+#[test]
+fn sagittal_inset_has_articulator_shells() {
+    // The schematic vocal tract should have the four parts the JS
+    // animates: tongue, lips, cords, airflow path.
+    let html = build_site();
+    let doc = Html::parse_document(&html);
+    for id in ["sagittal", "tongue", "lips", "cords", "airflow"] {
+        let s = Selector::parse(&format!("#{id}")).unwrap();
+        assert!(
+            doc.select(&s).next().is_some(),
+            "expected #{id} in sagittal inset"
+        );
+    }
+}
+
+#[test]
+fn workspace_has_path_layer_for_word_tracing() {
+    // The word-path overlay needs an empty <g id="path-layer"> shell
+    // inside the chart SVG so behavior.js doesn't have to mint it.
+    let html = build_site();
+    let doc = Html::parse_document(&html);
+    let s = Selector::parse("#ipa-chart #path-layer").unwrap();
+    assert!(
+        doc.select(&s).next().is_some(),
+        "expected empty #path-layer inside #ipa-chart"
+    );
 }
 
 #[test]
