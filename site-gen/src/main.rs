@@ -1667,7 +1667,7 @@ function showSuggestions(q) {{
     return;
   }}
   suggestEl.innerHTML=hits.map(function(i){{
-    return '<button class="suggestion-item" onclick="searchAndShow('+JSON.stringify(WORDS[i][0])+')">'
+    return '<button class="suggestion-item" onclick="searchAndShow('+escHTML(JSON.stringify(WORDS[i][0]))+')">'
       +'<span class="sug-word">'+escHTML(WORDS[i][0])+'</span>'
       +'<span class="sug-ipa ipa-font">'+escHTML(WORDS[i][1])+'</span>'
       +'<span class="sug-rank">#'+(i+1)+'</span>'
@@ -1720,7 +1720,7 @@ function showWordResult(word, ipa, rank) {{
       +' style="--tok-color:'+info.color+';"'
       +' aria-label="'+escHTML(info.name)+'"'
       +' title="'+escHTML(info.name)+'"'
-      +' onclick="selectPhoneme(this,'+JSON.stringify(ch)+')">'
+      +' onclick="selectPhoneme(this,'+escHTML(JSON.stringify(ch))+')">'
       +'<span class="tok-sym">'+escHTML(ch)+'</span>'
       +(label?'<span class="tok-label">'+label+'</span>':'')
       +'</button>';
@@ -1794,7 +1794,7 @@ function renderPhonemePanel(ch) {{
       '<div class="panel-words-label">Words with /'+escHTML(ch)+'/</div>'
       +'<div class="panel-words">'
       +words.slice(0,20).map(function(w){{
-        return '<button class="panel-word" onclick="searchAndShow('+JSON.stringify(w[0])+')">'
+        return '<button class="panel-word" onclick="searchAndShow('+escHTML(JSON.stringify(w[0]))+')">'
           +escHTML(w[0])
           +'<span class="panel-word-ipa ipa-font">'+escHTML(w[1])+'</span>'
           +'</button>';
