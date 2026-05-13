@@ -50,6 +50,24 @@
   let reverseDebounce = null;
   let animationToken = 0;   // monotonic id; cancels old animations
 
+  /* ── Workspace state ────────────────────────────────────────────
+   *
+   *   selectedCh — phoneme the user has *clicked* on the chart.
+   *                Sticky: persists across hover and mouseleave.
+   *                When set, the sagittal stays on it and the chart
+   *                phoneme shows the `.selected` visual state.
+   *
+   *   lastStep   — the phoneme the most-recent word-path animation
+   *                ended on. When nothing is selected, this is what
+   *                the sagittal falls back to on mouseleave so the
+   *                inset never "snaps to nothing".
+   *
+   *   The interaction model: hover *previews*, click *commits*.
+   *   Click again on the same phoneme to release.
+   */
+  let selectedCh = null;
+  let lastStep   = null;
+
   /* ── Helpers ────────────────────────────────────────────────── */
   function escHTML(s) {
     return String(s)
@@ -272,47 +290,48 @@
   /* ── Animate the path across the chart + sagittal inset ─────── */
   async function animateWord(path) {
     const token = ++animationToken;
-    // Clear any previous path / phoneme highlights.
+    // Clear the prior word's drawing — both the path strokes and the
+    // `.on-path` marker on every chart phoneme that was in it.
     while (pathLayer.firstChild) pathLayer.removeChild(pathLayer.firstChild);
-    chartEl.querySelectorAll('.ph.active').forEach(el => el.classList.remove('active'));
+    chartEl.querySelectorAll('.ph.on-path').forEach(el => el.classList.remove('on-path'));
 
-    // Pre-draw the path as a single SVG <path> with stroke-dasharray
-    // animation, plus per-phoneme badges.
-    if (path.length === 0) return;
+    if (path.length === 0) { lastStep = null; return; }
+
     let d = `M ${path[0].x.toFixed(2)} ${path[0].y.toFixed(2)}`;
     for (let i = 1; i < path.length; i++) {
       d += ` L ${path[i].x.toFixed(2)} ${path[i].y.toFixed(2)}`;
     }
     const pathEl = ns('path', { d, class: 'word-path' });
     pathLayer.appendChild(pathEl);
-    // Trigger the stroke-dashoffset animation. We need the layout
-    // computed first so pathLength is correct.
     const totalLen = pathEl.getTotalLength();
     pathEl.style.strokeDasharray = `${totalLen}`;
     pathEl.style.strokeDashoffset = `${totalLen}`;
-    // Force layout flush, then animate.
     void pathEl.getBoundingClientRect();
     const totalMs = Math.max(700, path.length * 220);
     pathEl.style.transition = `stroke-dashoffset ${totalMs}ms cubic-bezier(.45,.05,.55,.95)`;
     pathEl.style.strokeDashoffset = '0';
 
-    // Step through phonemes in sync with the path draw.
     const perStep = Math.floor(totalMs / Math.max(path.length, 1));
     for (let i = 0; i < path.length; i++) {
-      if (token !== animationToken) return;     // newer animation cancels us
+      if (token !== animationToken) return;
       const stop = path[i];
-      // Numbered badge at this stop.
-      const g = ns('g', { class: 'path-stop', transform: `translate(${stop.x.toFixed(2)} ${stop.y.toFixed(2)})` });
+      // Numbered, clickable badge at this stop. Carries data-ch +
+      // data-step so the delegated click handler can route to it.
+      const g = ns('g', {
+        class: 'path-stop',
+        'data-ch': stop.ch,
+        'data-step': String(stop.order),
+        transform: `translate(${stop.x.toFixed(2)} ${stop.y.toFixed(2)})`,
+      });
       g.appendChild(ns('circle', { r: 2.6, class: 'stop-bg' }));
       g.appendChild(ns('text',
         { 'text-anchor': 'middle', 'dominant-baseline': 'central', y: 0.4, class: 'stop-n' },
         String(stop.order)));
       pathLayer.appendChild(g);
-      // Highlight the underlying phoneme glyph too.
       const glyph = chartEl.querySelector(`.ph[data-ch="${CSS.escape(stop.ch)}"]`);
-      if (glyph) glyph.classList.add('active');
-      // Move the sagittal inset to this phoneme.
+      if (glyph) glyph.classList.add('on-path');
       paintSagittal(stop.ch);
+      lastStep = stop.ch;
       await sleep(perStep);
     }
   }
@@ -369,6 +388,9 @@
     wRank.textContent = '#' + (rankZeroIdx + 1) + ' by frequency';
     wHint.textContent = makeHint(word, ipa);
     renderSpellingBand(word, ipa);
+    // A new word resets the per-phoneme commitment — the user is
+    // now studying the word, not a specific phoneme.
+    releaseSelection();
     const path = chartPathFor(ipa);
     animateWord(path);
     // Surface the first phoneme on the sagittal immediately so a user
@@ -408,11 +430,61 @@
     wGlyph.textContent = ''; wIpa.textContent = ''; wRank.textContent = ''; wHint.textContent = '';
     while (pathLayer.firstChild) pathLayer.removeChild(pathLayer.firstChild);
     while (spellEl.firstChild) spellEl.removeChild(spellEl.firstChild);
+    chartEl.querySelectorAll('.ph.on-path').forEach(el => el.classList.remove('on-path'));
+    releaseSelection();
+    lastStep = null;
   }
 
-  /* ── Chart phoneme hover/click → sagittal preview ───────────── */
-  function focusPhoneme(ch) {
+  /* ── Chart phoneme focus model ──────────────────────────────────
+   *
+   * `previewPhoneme` runs on hover. It paints the sagittal but only
+   * if the user hasn't *committed* to a phoneme via click. With a
+   * commitment in place, hovering is purely visual on the chart side
+   * (the underlying tile shows :hover styling) but the sagittal
+   * stays put.
+   *
+   * `togglePhonemeSelection` runs on click. Clicking a fresh phoneme
+   * commits to it. Clicking the same phoneme again releases the
+   * commitment.
+   *
+   * `revertToBaseline` runs on mouseleave from the chart. With a
+   * selection, sagittal stays on it. Without one, it falls back to
+   * the final phoneme of the most-recent word path so the inset is
+   * never "snapped to nothing".
+   */
+  function previewPhoneme(ch) {
+    if (selectedCh) return;
     paintSagittal(ch);
+  }
+  function togglePhonemeSelection(ch) {
+    if (selectedCh === ch) {
+      releaseSelection();
+      return;
+    }
+    if (selectedCh) {
+      const prev = chartEl.querySelector(`.ph[data-ch="${CSS.escape(selectedCh)}"]`);
+      if (prev) prev.classList.remove('selected');
+    }
+    selectedCh = ch;
+    const next = chartEl.querySelector(`.ph[data-ch="${CSS.escape(ch)}"]`);
+    if (next) next.classList.add('selected');
+    paintSagittal(ch);
+  }
+  function releaseSelection() {
+    if (!selectedCh) return;
+    const prev = chartEl.querySelector(`.ph[data-ch="${CSS.escape(selectedCh)}"]`);
+    if (prev) prev.classList.remove('selected');
+    selectedCh = null;
+    revertToBaseline();
+  }
+  function revertToBaseline() {
+    const target = selectedCh || lastStep;
+    if (target) paintSagittal(target);
+  }
+  /** Click a path-stop badge to jump the sagittal to that step. */
+  function focusPathStep(ch) {
+    paintSagittal(ch);
+    lastStep = ch;
   }
 
   /* ── Reverse phoneme search ─────────────────────────────────── */
@@ -451,19 +523,30 @@
     if (e.target.closest('#search-clear')) { clearAll(); return; }
     const wordEl = e.target.closest('[data-word]');
     if (wordEl) { e.preventDefault(); searchAndShow(wordEl.dataset.word); return; }
+    const stopEl = e.target.closest('.path-stop[data-ch]');
+    if (stopEl) { e.preventDefault(); focusPathStep(stopEl.dataset.ch); return; }
     const phEl = e.target.closest('.ph[data-ch]');
-    if (phEl) { e.preventDefault(); focusPhoneme(phEl.dataset.ch); return; }
+    if (phEl) { e.preventDefault(); togglePhonemeSelection(phEl.dataset.ch); return; }
+    // Click on chart background (anywhere in the chart svg that
+    // isn't a phoneme tile or a path stop) clears any committed
+    // selection — same gesture as clicking on the underlying canvas
+    // in a typical map / diagram interaction.
+    if (e.target.closest('#ipa-chart')) {
+      releaseSelection();
+      return;
+    }
     if (!e.target.closest('.word-picker')) hideSuggestions();
   });
 
-  // Hover on chart phonemes also previews them on the sagittal,
-  // without locking in (so it springs back to the word's last
-  // phoneme on mouseleave).
-  let hoverLast = null;
+  // Hover on chart phonemes previews the sagittal — but only while
+  // nothing is *committed* via click. With a selection, hovering
+  // still shows the chart's :hover state on the tile but the
+  // sagittal stays locked.
   chartEl?.addEventListener('mouseover', (e) => {
     const phEl = e.target.closest('.ph[data-ch]');
-    if (phEl) { hoverLast = phEl.dataset.ch; paintSagittal(hoverLast); }
+    if (phEl) previewPhoneme(phEl.dataset.ch);
   });
+  chartEl?.addEventListener('mouseleave', () => revertToBaseline());
 
   document.addEventListener('input', (e) => {
     if (e.target === qEl) handleSearchInput();

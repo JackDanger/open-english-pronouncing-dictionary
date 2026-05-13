@@ -108,6 +108,28 @@ await check('clicking a chart phoneme moves the sagittal', async () => {
   if (after !== 'ʃ') throw new Error(`expected 'ʃ' after click, got '${after}' (was '${before}')`);
 });
 
+await check('click commits a phoneme as .selected (sticky lock)', async () => {
+  // After the previous test the chart should have .ph[data-ch="ʃ"]
+  // carrying the .selected class.
+  const selected = await page.locator('#ipa-chart .ph.selected[data-ch="ʃ"]').count();
+  if (selected !== 1) throw new Error(`expected 1 .selected on /ʃ/, got ${selected}`);
+});
+
+await check('hover does NOT override a locked sagittal', async () => {
+  // /ʃ/ is still selected. Hover a different phoneme; sagittal must
+  // stay on /ʃ/.
+  await page.dispatchEvent('#ipa-chart .ph[data-ch="m"]', 'mouseover');
+  await page.waitForTimeout(80);
+  const glyph = await page.locator('#sagittal-glyph').textContent();
+  if (glyph !== 'ʃ') throw new Error(`expected sagittal locked on 'ʃ', got '${glyph}'`);
+});
+
+await check('second click on same phoneme releases the lock', async () => {
+  await page.click('#ipa-chart .ph[data-ch="ʃ"]');
+  const stillSelected = await page.locator('#ipa-chart .ph.selected').count();
+  if (stillSelected !== 0) throw new Error(`expected 0 .selected after toggle, got ${stillSelected}`);
+});
+
 await check('showcase row click routes through data-word', async () => {
   await page.click('.wrow:nth-of-type(45)');
   await page.waitForTimeout(1500);
