@@ -27,9 +27,16 @@
 //! — there is no inline JavaScript anywhere in the rendered HTML.
 
 mod analysis;
+mod chart_layout;
 mod distance_matrix;
 mod minimal_pairs;
 mod phoneme_meta;
+mod sagittal;
+// The spelling alignment is consumed by the client JS (which ports
+// the algorithm directly), not by Rust render code today. The Rust
+// version stays as the canonical reference + unit-test bench.
+#[allow(dead_code)]
+mod spelling_align;
 mod render;
 mod util;
 
