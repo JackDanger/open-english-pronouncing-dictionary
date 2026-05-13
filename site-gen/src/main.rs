@@ -702,6 +702,19 @@ fn js_str(s: &str) -> String {
     out
 }
 
+// Same as `js_str` but the result is *also* safe to embed inside an
+// HTML attribute delimited by double quotes. `js_str` emits
+// `"the"` (5 chars). Drop that into `onclick="…"` and the browser
+// sees `onclick="searchAndShow("` — broken markup, broken JS.
+//
+// HTML-encoding the surrounding double-quote chars (and the `&` so
+// the encoding itself can't be misread) yields `&quot;the&quot;`,
+// which the browser unencodes back to a real `"` only at parse time
+// — after the attribute boundary is already established.
+fn js_attr_str(s: &str) -> String {
+    js_str(s).replace('&', "&amp;").replace('"', "&quot;")
+}
+
 // ── Static CSS ────────────────────────────────────────────────────────────────
 
 const CSS: &str = r#"
@@ -1357,7 +1370,7 @@ fn render_search_section() -> String {
         "bouquet", "receipt",
     ]
     .iter()
-    .map(|w| format!("<button class=\"try-word\" onclick=\"searchAndShow({})\">{w}</button>", js_str(w)))
+    .map(|w| format!("<button class=\"try-word\" onclick=\"searchAndShow({})\">{w}</button>", js_attr_str(w)))
     .collect::<Vec<_>>()
     .join("\n      ");
 
@@ -1437,7 +1450,7 @@ fn render_phonemes_section(stats: &Stats) -> String {
                 ));
             }
 
-            let ch_js = js_str(&ch.to_string());
+            let ch_js = js_attr_str(&ch.to_string());
             tiles.push_str(&format!(
                 "<div class=\"ptile\" data-ch=\"{ch_esc}\" style=\"--tile-color:{color};--sz:{sz};\" onclick=\"selectPhonemeFromUniverse({ch_js})\" aria-label=\"{ch_esc}: {count_fmt}\">\n  <span class=\"ptile-ch ipa-font\">{ch_esc}</span>\n  <span class=\"ptile-count\">{count_fmt}</span>\n  <div class=\"ptile-popup\"><div class=\"popup-title\">/{ch_esc}/</div>{examples_html}<div class=\"popup-tap\">Click to explore</div></div>\n</div>\n"
             ));
@@ -1462,7 +1475,7 @@ fn render_phonemes_section(stats: &Stats) -> String {
 fn render_showcase_section(stats: &Stats) -> String {
     let mut rows = String::new();
     for (word, ipa, rank) in &stats.showcase {
-        let w_js = js_str(word);
+        let w_js = js_attr_str(word);
         rows.push_str(&format!(
             "<div class=\"wrow\" onclick=\"searchAndShow({w_js})\" role=\"button\" tabindex=\"0\">\
              <span class=\"wrow-rank\">#{rank}</span>\
