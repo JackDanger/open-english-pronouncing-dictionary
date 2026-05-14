@@ -47,37 +47,35 @@ body {
 .mono     { font-family: 'JetBrains Mono', 'Courier New', monospace; }
 .ipa-font { font-family: 'Noto Serif', 'Palatino Linotype', Georgia, serif; }
 
-/* ── Hero (compact header strip) ────────────────────────────────────── */
-/* The workspace is the page's reason for existing. The hero used to
- * fill 50svh — replaced with a slim header strip so the chart is
- * visible on first paint. */
+/* ── Hero (single-line title strip) ─────────────────────────────────── */
+/* Reduced to just a title + GitHub link, taking ~50px of vertical
+ * real estate. Everything that used to live here (stats, eyebrow,
+ * sub-paragraph, CTAs) was redundant once the workspace exists. */
 #hero {
-  min-height: 0;
-  background: linear-gradient(160deg, var(--b950) 0%, var(--b900) 45%, var(--b800) 100%);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  position: relative; overflow: hidden; text-align: center;
-  padding: 1.25rem 2rem 1.5rem;
+  background: linear-gradient(160deg, var(--b950) 0%, var(--b900) 60%, var(--b800) 100%);
+  padding: .65rem 2rem;
 }
-.hero-bg { position: absolute; inset: 0; pointer-events: none; overflow: hidden; user-select: none; }
-.hero-bg span {
-  position: absolute;
-  font-family: 'Noto Serif', Georgia, serif;
-  color: rgba(255,255,255,.04);
-  line-height: 1;
-  animation: heroFloat linear infinite;
+.hero-content {
+  max-width: 1300px;
+  margin: 0 auto;
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 1rem;
 }
-@keyframes heroFloat {
-  0%   { transform: translateY(0)    rotate(0deg);  opacity: .03; }
-  30%  { transform: translateY(-18px) rotate(4deg); opacity: .07; }
-  60%  { transform: translateY(10px)  rotate(-3deg); opacity: .04; }
-  100% { transform: translateY(0)    rotate(0deg);  opacity: .03; }
+.hero-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--cream);
+  letter-spacing: -.005em;
 }
-.hero-content  { position: relative; z-index: 1; max-width: 920px; }
-.hero-eyebrow  { font-family: 'JetBrains Mono', monospace; font-size: .68rem; letter-spacing: .22em; text-transform: uppercase; color: var(--b300); margin-bottom: .3rem; }
-.hero-title    { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(1.5rem, 3.5vw, 2.2rem); font-weight: 800; color: var(--cream); line-height: 1.1; letter-spacing: -.01em; margin-bottom: .35rem; }
-.hero-sub      { color: var(--b200); font-size: .82rem; max-width: 640px; margin: 0 auto .55rem; line-height: 1.55; }
-.hero-cta      { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; }
-.btn           { padding: .35rem 1rem; font-size: .78rem; }
+.hero-link {
+  color: var(--b300);
+  font-size: .78rem;
+  text-decoration: none;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: .04em;
+}
+.hero-link:hover { color: var(--cream); }
 .btn { display: inline-block; padding: .6rem 1.35rem; border-radius: 2rem; font-size: .875rem; font-weight: 600; text-decoration: none; transition: all .2s; cursor: pointer; border: none; }
 .btn-primary { background: var(--cream); color: var(--b800); }
 .btn-primary:hover { background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,.22); }
@@ -255,7 +253,7 @@ body {
 /* ── Chart row: chart + sagittal ───────────────────────────────────── */
 .chart-row {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr 260px;
   gap: 1.5rem;
   align-items: start;
 }
@@ -272,10 +270,11 @@ body {
 #ipa-chart {
   width: 100%;
   height: auto;
-  /* aspect ratio comes from viewBox; max-height anchors the chart to
-   * the viewport so it's a single coherent canvas rather than a
-   * scroll-required diagram. */
-  max-height: 62svh;
+  /* With the hero collapsed and the stats / sources / showcase sections
+   * gone, the chart can claim a much bigger share of the viewport.
+   * The aspect ratio from viewBox keeps things proportional; this
+   * caps the height to ~75 % of small viewports. */
+  max-height: 76svh;
   user-select: none;
   display: block;
 }
@@ -618,12 +617,21 @@ body {
 .src-desc { font-size: .875rem; color: var(--b200); line-height: 1.55; }
 
 footer {
-  background: var(--b950); border-top: 1px solid rgba(255,255,255,.05);
-  padding: 2.5rem 2rem; text-align: center;
-  color: var(--b400); font-size: .875rem;
-  display: flex; flex-direction: column; align-items: center; gap: 1rem;
+  background: var(--b950);
+  padding: .55rem 2rem;
+  color: var(--b400);
+  font-size: .72rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: .9rem;
 }
-.footer-links { display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; }
 footer a { color: var(--b300); text-decoration: none; }
 footer a:hover { text-decoration: underline; }
-.license-badge { display: inline-block; padding: .2rem .6rem; border-radius: .25rem; background: rgba(255,255,255,.06); font-family: 'JetBrains Mono', monospace; font-size: .72rem; letter-spacing: .05em; }
+.license-badge {
+  padding: .12rem .5rem; border-radius: .25rem;
+  background: rgba(255,255,255,.06);
+  font-family: 'JetBrains Mono', monospace; font-size: .68rem;
+  letter-spacing: .05em;
+}
