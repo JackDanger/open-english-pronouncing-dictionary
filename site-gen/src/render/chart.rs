@@ -47,16 +47,15 @@ pub fn render(stats: &Stats) -> Markup {
         chars.insert(c);
     }
 
+    // No heading or paragraph here anymore. The workspace's
+    // top-level prompt frames the chart's role; the chart's own
+    // axis labels (VOWELS · CONSONANTS · front↔back · close↔open)
+    // do the rest of the work that the explanatory paragraph used
+    // to do. Removed because they read as duplicated furniture in
+    // a single-experience layout.
     html! {
         section id="chart" class="chart-section" {
             div class="chart-inner" {
-                h2 class="chart-title serif" { "Where each sound lives in your mouth" }
-                p class="chart-sub" {
-                    "Vowels in the top quadrilateral — front-to-back is your tongue's "
-                    "position in your mouth, top-to-bottom is how open your jaw is. "
-                    "Consonants below — left-to-right marches from your lips backwards "
-                    "to your throat; top-to-bottom is how you make the sound."
-                }
                 div class="chart-viewport" {
                     (chart_svg(&chars))
                 }

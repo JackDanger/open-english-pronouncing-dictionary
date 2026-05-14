@@ -130,12 +130,9 @@ await check('second click on same phoneme releases the lock', async () => {
   if (stillSelected !== 0) throw new Error(`expected 0 .selected after toggle, got ${stillSelected}`);
 });
 
-await check('showcase row click routes through data-word', async () => {
-  await page.click('.wrow:nth-of-type(45)');
-  await page.waitForTimeout(1500);
-  const w = await page.locator('#word-glyph').textContent();
-  if (!w) throw new Error('no word after showcase click');
-});
+// The 100-most-common-words showcase was removed when the workspace
+// was simplified to one experience. Sample chips remain the primary
+// quick-pick affordance (already covered above).
 
 await check('reverse search returns matches', async () => {
   await page.click('.reverse-summary');   // expand details
@@ -181,32 +178,46 @@ await check('drag a path stop from ɪ → i morphs ship into sheep', async () =>
   if (crumbText !== 'ship') throw new Error(`crumb says '${crumbText}'`);
 });
 
-await check('starting a drag lights up valid morph-target phonemes', async () => {
+await check('clicking a path stop lights up valid morph-target phonemes (sticky)', async () => {
   await page.click('.sample-chip[data-word="ship"]');
   await page.waitForTimeout(1500);
-  // Begin a drag on /ʃ/ (a consonant with many minimal-pair
-  // neighbours — hip, sip, tip, …). Don't release; check the
-  // lit landscape.
-  const result = await page.evaluate(async () => {
-    const stop = Array.from(document.querySelectorAll('.path-stop')).find(s => s.dataset.ch === 'ʃ');
-    const r = stop.getBoundingClientRect();
-    stop.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true, clientX:r.x+r.width/2, clientY:r.y+r.height/2, pointerId:1 }));
-    await new Promise(r => setTimeout(r, 80));
-    const lit  = Array.from(document.querySelectorAll('.ph.morph-target')).map(el => el.dataset.ch);
-    const labels = Array.from(document.querySelectorAll('.morph-label')).map(el => el.textContent);
-    const origin = document.querySelector('.ph.morph-origin')?.dataset?.ch;
-    // Release without moving — should clear everything.
-    document.dispatchEvent(new PointerEvent('pointerup', { bubbles:true, pointerId:1 }));
-    await new Promise(r => setTimeout(r, 80));
-    const litAfter = document.querySelectorAll('.ph.morph-target').length;
-    return { lit, labels, origin, litAfter };
-  });
+  // Click /ʃ/ stop. Lit state must appear AND persist (not flicker
+  // out on pointerup — sticky morph mode).
+  await page.click('.path-stop[data-ch="ʃ"]');
+  await page.waitForTimeout(200);
+  const result = await page.evaluate(() => ({
+    lit:    Array.from(document.querySelectorAll('.ph.morph-target')).map(el => el.dataset.ch),
+    labels: Array.from(document.querySelectorAll('.morph-label')).map(el => el.textContent),
+    origin: document.querySelector('.ph.morph-origin')?.dataset?.ch,
+  }));
   if (result.origin !== 'ʃ') throw new Error(`expected origin 'ʃ', got '${result.origin}'`);
   if (result.lit.length < 5) throw new Error(`expected ≥5 lit moves, got ${result.lit.length}`);
   if (!result.labels.some(l => l === 'hip' || l === 'sip' || l === 'tip')) {
-    throw new Error(`expected at least one common minimal-pair word in labels, saw ${result.labels.slice(0,5).join(', ')}`);
+    throw new Error(`expected a common minimal-pair word in labels, saw ${result.labels.slice(0,5).join(', ')}`);
   }
-  if (result.litAfter !== 0) throw new Error('lit state should clear on release');
+});
+
+await check('clicking a lit tile commits the morph (no drag required)', async () => {
+  // Continuing from the previous test, /ʃ/ stop is in sticky morph
+  // mode. Clicking the /s/ tile should morph ship → sip.
+  await page.click('.ph[data-ch="s"]');
+  await page.waitForTimeout(200);
+  const word = await page.locator('#word-glyph').textContent();
+  if (word !== 'sip') throw new Error(`expected 'sip' after clicking lit tile, got '${word}'`);
+});
+
+await check('clicking chart background exits sticky morph mode', async () => {
+  // After morphing to sip, morph mode should still be active. Click
+  // the chart's background (somewhere that isn't a tile or stop) to
+  // exit. The lit tiles should disappear.
+  await page.evaluate(() => {
+    // Click on the chart's outer SVG background, off any phoneme tile.
+    const svg = document.getElementById('ipa-chart');
+    svg.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+  await page.waitForTimeout(120);
+  const lit = await page.locator('.ph.morph-target').count();
+  if (lit !== 0) throw new Error(`expected lit state cleared, ${lit} tiles still lit`);
 });
 
 await check('drag releases on a dim tile snap to a valid target instead', async () => {

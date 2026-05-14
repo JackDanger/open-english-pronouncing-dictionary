@@ -97,39 +97,51 @@ body {
 .stat-label { font-size: .65rem; color: var(--b300); text-transform: uppercase; letter-spacing: .12em; }
 
 /* ── Workspace section ──────────────────────────────────────────────── */
-.workspace-section { background: #fff; padding: 1.25rem 2rem 2.5rem; }
+/*
+ * The workspace is ONE coherent experience. No nested cards inside it
+ * — search input on top, big word display under, spelling band under
+ * that, chart + tract underneath, supporting controls at the bottom.
+ * The flow reads top-to-bottom without the eye having to jump between
+ * disconnected cards.
+ */
+.workspace-section { background: #fff; padding: 1.5rem 2rem 2.5rem; }
 .workspace-inner   { max-width: 1300px; margin: 0 auto; }
 
-/* Word header: picker + display in one tight row, hint underneath.
- * The whole header collapses vertically so the chart can claim the
- * viewport instead of sitting below the fold. */
-.word-header {
+/* Word pane: prominent search input on top, current word + IPA + hint
+ * underneath. The search visibly drives the display below. */
+.word-pane {
   display: grid;
-  grid-template-columns: minmax(0, 280px) 1fr;
-  gap: 1.5rem;
-  align-items: center;
+  grid-template-rows: auto auto auto;
+  gap: .55rem;
+  padding-bottom: .9rem;
+  margin-bottom: .9rem;
   border-bottom: 1px solid var(--cream-d);
-  padding-bottom: .65rem;
-  margin-bottom: .5rem;
 }
-@media (max-width: 760px) { .word-header { grid-template-columns: 1fr; } }
+.word-pane .word-picker { position: relative; max-width: 560px; }
 
-.word-picker { position: relative; }
 .search-box {
   display: flex; align-items: center;
   background: var(--cream);
   border: 2px solid var(--b200);
   border-radius: 3rem;
-  padding: .55rem 1.1rem;
-  gap: .6rem;
+  padding: .75rem 1.4rem;
+  gap: .65rem;
   transition: border-color .2s, box-shadow .2s;
 }
 .search-box:focus-within {
   border-color: var(--b600);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--b600) 12%, transparent);
 }
-.search-icon { font-size: 1rem; color: var(--b400); }
-#q { flex: 1; border: none; background: transparent; font-family: inherit; font-size: 1rem; color: #1c0d12; outline: none; min-width: 0; }
+.search-icon { font-size: 1.1rem; color: var(--b400); }
+#q {
+  flex: 1;
+  border: none; background: transparent;
+  font-family: inherit;
+  font-size: 1.15rem;
+  color: #1c0d12;
+  outline: none;
+  min-width: 0;
+}
 #q::placeholder { color: var(--b300); }
 .search-clear { background: none; border: none; color: var(--b400); font-size: 1rem; cursor: pointer; padding: 0 .25rem; line-height: 1; display: none; }
 .search-clear.visible { display: block; }
@@ -208,11 +220,11 @@ body {
 
 /* ── Spelling band ─────────────────────────────────────────────────── */
 .spelling-band-wrap {
-  background: var(--cream);
-  border-radius: var(--radius);
-  padding: .5rem .75rem .35rem;
-  margin-bottom: .65rem;
-  border: 1px solid var(--cream-d);
+  /* Inline in the workspace flow, no card chrome. Just a small
+   * label-like band between the word pane and the chart. */
+  padding: 0 0 .65rem;
+  margin-bottom: .35rem;
+  border-bottom: 1px dashed var(--cream-d);
 }
 #spelling-band { width: 100%; height: 56px; display: block; }
 .sb-letter {
@@ -249,14 +261,11 @@ body {
 }
 @media (max-width: 980px) { .chart-row { grid-template-columns: 1fr; } }
 
-.chart-section {
-  background: var(--cream);
-  border: 1px solid var(--cream-d);
-  border-radius: var(--radius);
-  padding: .75rem .9rem .65rem;
-}
-.chart-title { font-size: .9rem; font-weight: 700; color: var(--b800); margin-bottom: .15rem; }
-.chart-sub   { font-size: .75rem; color: #6b5a5c; margin-bottom: .55rem; line-height: 1.5; }
+/* The chart is the centerpiece — no card, no decoration, just the
+ * SVG sitting in the workspace surface. The chart's own axis labels
+ * (VOWELS / CONSONANTS / front-back / close-open) carry whatever
+ * orientation copy used to live in chart-title / chart-sub. */
+.chart-section { padding: 0; }
 .chart-viewport { width: 100%; }
 
 /* ── IPA chart SVG ─────────────────────────────────────────────────── */
@@ -446,10 +455,7 @@ body {
 
 /* ── Sagittal / vocal-tract inset ──────────────────────────────────── */
 .sagittal-wrap {
-  background: var(--cream);
-  border: 1px solid var(--cream-d);
-  border-radius: var(--radius);
-  padding: 1rem 1rem .9rem;
+  padding: 0 0 .9rem;
   position: sticky; top: 1rem;
 }
 .sagittal-header {

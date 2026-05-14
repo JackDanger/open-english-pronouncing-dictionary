@@ -17,7 +17,6 @@ mod css;
 mod footer;
 mod hero;
 mod scripts;
-mod showcase;
 mod sources;
 mod stats_band;
 mod workspace;
@@ -29,6 +28,7 @@ mod workspace;
 #[allow(dead_code)] mod phonemes;
 #[allow(dead_code)] mod reverse_search;
 #[allow(dead_code)] mod search;
+#[allow(dead_code)] mod showcase;
 
 /// Build the entire static page as one HTML document.
 pub fn html_doc(
@@ -59,7 +59,6 @@ pub fn html_doc(
                 (hero::render(stats))
                 (stats_band::render(stats))
                 (workspace::render(stats))
-                (showcase::render(stats))
                 (sources::render(stats))
                 (footer::render())
                 (scripts::render(stats, matrix, pairs))

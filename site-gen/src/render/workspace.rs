@@ -29,29 +29,30 @@ pub fn render(stats: &Stats) -> Markup {
     html! {
         section id="workspace" class="workspace-section" {
             div class="workspace-inner" {
-                // ── Word picker + current word display ──
-                (word_header())
-                // ── Spelling-to-sound band ──
+                // Three-stage flow, top to bottom, no card chrome:
+                //   1. picker       (what word)
+                //   2. spelling band (letters → sounds)
+                //   3. chart + tract (where those sounds live + how to make them)
+                //
+                // A single workspace, not a stack of separate panels.
+                (word_pane())
                 (spelling_band_shell())
-                // ── Chart + sagittal side-by-side ──
                 div class="chart-row" {
                     (chart::render(stats))
                     (sagittal_shell())
                 }
-                // ── Sample words + reverse search ──
-                (sample_strip())
-                (reverse_strip())
+                (footer_strip())
             }
         }
     }
 }
 
-/// Big serif word + IPA + rank line at the top of the workspace.
-/// Pre-populated by JS with the featured first word; updates on every
-/// new selection. We render only the wrapper shells here.
-fn word_header() -> Markup {
+/// Search input on top, current word + IPA + hint underneath. One
+/// block, so the eye sees the input feeding into the result rather
+/// than two unrelated panels.
+fn word_pane() -> Markup {
     html! {
-        header class="word-header" {
+        header class="word-pane" {
             div class="word-picker" {
                 div class="search-box" {
                     span class="search-icon" aria-hidden="true" { "▶" }
@@ -59,7 +60,7 @@ fn word_header() -> Markup {
                           type="search"
                           autocomplete="off"
                           spellcheck="false"
-                          placeholder="type any English word — see your mouth move through it"
+                          placeholder="type any English word"
                           aria-label="Word to explore";
                     button id="search-clear"
                            class="search-clear"
@@ -71,25 +72,33 @@ fn word_header() -> Markup {
                 span id="word-glyph" class="word-glyph serif" {}
                 span id="word-ipa" class="word-ipa ipa-font" {}
                 span id="word-rank" class="word-rank" {}
-                // Morph breadcrumb: when the user drags a path stop
-                // to a new phoneme and the resulting IPA is still a
-                // real English word, this announces the change. JS
-                // toggles `.visible` to show / hide.
+                // Morph breadcrumb: when the user has dragged or
+                // tapped a path stop to morph the word, "↺ from X"
+                // shows the original (clickable to return).
                 span id="morph-breadcrumb" class="morph-breadcrumb" {
                     span class="mb-arrow" { "↺" }
                     " from "
                     button id="morph-reset" class="morph-reset" type="button" {}
                 }
-                // "Not a word" indicator — shown when the dragged
-                // configuration doesn't spell any English word.
+                // Defensive shell — the lit-moves interaction can no
+                // longer produce a non-word, but the indicator stays
+                // in the DOM in case some future path produces one.
                 span id="morph-noword" class="morph-noword" {
                     "no English word with these sounds"
                 }
             }
-            // Hint line — replaces the old "fun fact" block but
-            // appears in-flow with the header. Keeps copy nearby
-            // to where the word is shown.
             p id="word-hint" class="word-hint" {}
+        }
+    }
+}
+
+/// Footer strip: sample chips on top, reverse-search disclosure
+/// below. Sits as one row of supporting controls under the chart.
+fn footer_strip() -> Markup {
+    html! {
+        div class="footer-strip" {
+            (sample_strip())
+            (reverse_strip())
         }
     }
 }
