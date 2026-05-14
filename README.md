@@ -1,6 +1,12 @@
-# open-english-pronouncing-dictionary
+# Open English Pronouncing Dictionary
 
-*OpenEPD* — an open, fused English IPA pronunciation dictionary. ~280,000 US English words with canonical IPA, optional pronunciation variants, frequency-derived rarity rank, and per-entry source provenance. CC-BY-SA 4.0.
+*OpenEPD*  is a synthesis of multiple open phonetics corpi. You can use this freely under CC-BY-SA 4.0
+
+This has ~280,000 US English words with canonical IPA, optional pronunciation variants, frequency-derived rarity rank, and per-entry source provenance.
+
+## Interactive explorer
+
+We render `data/openepd.json` into [an educational site](https://jackdanger.github.io/open-english-pronouncing-dictionary/) that lets a non-linguist type any word and see its phonemes annotated.
 
 ```json
 {
@@ -40,10 +46,6 @@ Fusing them gives narrow vowel quality, long-tail coverage, *and* variant captur
 | [`wordfreq`](https://pypi.org/project/wordfreq/) | n/a | MIT | Per-word rarity rank from Zipf frequency. |
 
 The pipeline in `corpus/` is reproducible — fetch the four source files, run `corpus/build.py`, get the exact `data/openepd.json` we ship. Details (ARPABET → IPA mapping, Misaki near-IPA expansion, WikiPron narrow-form stripping) live in [`corpus/README.md`](corpus/README.md).
-
-## Interactive explorer
-
-`site-gen` (a non-published workspace member) renders `data/openepd.json` into a static educational site that lets a non-linguist type any word and see its phonemes annotated. The CI deploys it to [GitHub Pages](https://jackdanger.github.io/open-english-pronouncing-dictionary/) on every push to main.
 
 Run it locally:
 
