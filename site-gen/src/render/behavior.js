@@ -509,6 +509,7 @@
     // breadcrumb — the user is now studying this word, not riffing
     // on something else.
     releaseSelection();
+    exitMorphMode();
     originalWord = word;
     document.getElementById('morph-breadcrumb')?.classList.remove('visible');
     document.getElementById('morph-noword')?.classList.remove('visible');
@@ -551,6 +552,7 @@
     while (spellEl.firstChild) spellEl.removeChild(spellEl.firstChild);
     chartEl.querySelectorAll('.ph.on-path').forEach(el => el.classList.remove('on-path'));
     releaseSelection();
+    exitMorphMode();
     lastStep = null;
   }
 
@@ -610,6 +612,39 @@
     lastStep = ch;
   }
 
+  /** Enter sticky morph-mode for `idx`. Lights the chart's valid
+   * targets and keeps them lit until exitMorphMode is called.
+   * Idempotent: re-entering the same idx is a no-op so click flows
+   * after pointerdown don't flicker. */
+  function enterMorphMode(idx) {
+    if (morphModeIdx === idx) return;
+    if (morphModeIdx !== null) clearMorphTargets();
+    morphModeIdx = idx;
+    const targets = computeMorphTargets(idx);
+    lightMorphTargets(idx, targets);
+  }
+  function exitMorphMode() {
+    if (morphModeIdx === null) return;
+    morphModeIdx = null;
+    clearMorphTargets();
+  }
+  /** Commit a morph by tapping a lit tile (no drag required).
+   * Updates currentPath then re-lights the chart so the user can
+   * chain morphs at the same slot in the new word's context. */
+  function morphTo(idx, ch) {
+    const c = chartCoordsFor(ch);
+    if (!c) return;
+    currentPath[idx] = { ...currentPath[idx], ch, x: c.x, y: c.y };
+    redrawPath();
+    paintSagittal(ch);
+    lastStep = ch;
+    refreshWordFromPath();
+    // Stay in morph mode — recompute targets from the new word.
+    clearMorphTargets();
+    const targets = computeMorphTargets(idx);
+    lightMorphTargets(idx, targets);
+  }
+
   /* ── Drag-to-morph ──────────────────────────────────────────────
    *
    * Each path stop is a draggable handle. While dragging, the stop
@@ -625,6 +660,15 @@
    * so they can always return.
    */
   let dragState = null;
+  /** Sticky morph mode. When set, the chart is lit up with the
+   * valid morph targets for this path-stop index. The state
+   * persists until the user dismisses it (click elsewhere, load a
+   * new word, click the same stop again).
+   *
+   * This is what makes lit-moves discoverable without a drag —
+   * clicking a numbered stop surfaces the landscape and leaves
+   * it visible while the user reads. */
+  let morphModeIdx = null;
 
   /** Compute morph-targets for a given path-stop index: every phoneme
    * in the same plane that, if substituted into this slot, produces
@@ -699,18 +743,18 @@
     const idx = +stopGroup.dataset.idx;
     if (!Number.isFinite(idx) || idx < 0 || idx >= currentPath.length) return;
     e.preventDefault();
-    // Cancel any in-flight word animation so the sagittal walk
-    // doesn't fight the user's drag for control.
     cancelAnimation();
     const targets    = computeMorphTargets(idx);
     const originalCh = currentPath[idx].ch;
-    // Always allow snap to the original — gives the user an obvious
-    // "back to start" target during the drag.
-    const validSet = new Set([originalCh, ...targets.keys()]);
+    const validSet   = new Set([originalCh, ...targets.keys()]);
     dragState = { idx, dragging: false, originalCh, targets, validSet };
     stopGroup.setPointerCapture?.(e.pointerId);
     stopGroup.classList.add('dragging');
-    lightMorphTargets(idx, targets);
+    // Sticky morph mode tracks this stop. enterMorphMode is
+    // idempotent if we're already on this idx, so the subsequent
+    // click event doesn't flicker. The lit state persists across
+    // pointerup so it's still visible after a tap.
+    enterMorphMode(idx);
   }
   function onStopPointerMove(e) {
     if (!dragState) return;
@@ -745,7 +789,9 @@
     if (!dragState) return;
     dragState = null;
     chartEl.querySelectorAll('.path-stop.dragging').forEach(el => el.classList.remove('dragging'));
-    clearMorphTargets();
+    // Morph mode stays lit — the user can continue tapping lit
+    // tiles to chain morphs. clearMorphTargets fires via
+    // exitMorphMode when the user actively dismisses.
   }
 
   /** Recompute IPA from `currentPath`, look it up, and update the
@@ -831,18 +877,48 @@
   /* ── Delegated listeners ────────────────────────────────────── */
   document.addEventListener('click', (e) => {
     if (e.target.closest('#search-clear')) { clearAll(); return; }
-    if (e.target.closest('#morph-reset')) { e.preventDefault(); resetToOriginal(); return; }
+    if (e.target.closest('#morph-reset'))  { e.preventDefault(); resetToOriginal(); return; }
     const wordEl = e.target.closest('[data-word]');
-    if (wordEl) { e.preventDefault(); searchAndShow(wordEl.dataset.word); return; }
+    if (wordEl) { e.preventDefault(); exitMorphMode(); searchAndShow(wordEl.dataset.word); return; }
+
+    // In morph mode, clicking a lit tile commits the morph (no drag
+    // required — click is the fast path).
+    if (morphModeIdx !== null) {
+      const litEl = e.target.closest('.ph.morph-target[data-ch]');
+      if (litEl) {
+        e.preventDefault();
+        morphTo(morphModeIdx, litEl.dataset.ch);
+        return;
+      }
+    }
+
+    // Clicking a numbered path-stop enters sticky morph-mode AND
+    // focuses the sagittal on that phoneme. The lit landscape stays
+    // visible until the user dismisses it (click background, load a
+    // new word, click the same stop again).
     const stopEl = e.target.closest('.path-stop[data-ch]');
-    if (stopEl) { e.preventDefault(); focusPathStep(stopEl.dataset.ch); return; }
+    if (stopEl) {
+      e.preventDefault();
+      const idx = +stopEl.dataset.idx;
+      focusPathStep(stopEl.dataset.ch);
+      enterMorphMode(idx);
+      return;
+    }
+
+    // Outside morph-mode, clicking a chart phoneme tile toggles
+    // "study this sound" selection (the older affordance).
     const phEl = e.target.closest('.ph[data-ch]');
-    if (phEl) { e.preventDefault(); togglePhonemeSelection(phEl.dataset.ch); return; }
-    // Click on chart background (anywhere in the chart svg that
-    // isn't a phoneme tile or a path stop) clears any committed
-    // selection.
+    if (phEl) {
+      e.preventDefault();
+      if (morphModeIdx !== null) exitMorphMode();  // user clicked a non-target tile
+      togglePhonemeSelection(phEl.dataset.ch);
+      return;
+    }
+
+    // Click on chart background clears morph-mode + selection.
     if (e.target.closest('#ipa-chart')) {
       releaseSelection();
+      exitMorphMode();
       return;
     }
     if (!e.target.closest('.word-picker')) hideSuggestions();
