@@ -106,12 +106,9 @@ fn chart_svg(chars: &BTreeSet<char>) -> Markup {
 
             (background_decoration())
 
-            // Word-path overlay layer. Populated by behavior.js when
-            // a word is selected; we just emit the empty placeholder
-            // with stable id so the JS doesn't have to mint nodes.
-            g id="path-layer" class="path-layer" {}
-
-            // Phoneme glyphs.
+            // Phoneme glyphs first — they sit on the canvas, in
+            // their anatomical positions. SVG z-order is by document
+            // order, so anything emitted after these renders on top.
             g class="phonemes" {
                 @for ch in &vowels {
                     (phoneme_glyph(*ch))
@@ -120,6 +117,14 @@ fn chart_svg(chars: &BTreeSet<char>) -> Markup {
                     (phoneme_glyph(*ch))
                 }
             }
+
+            // Word-path overlay layer LAST so its stops sit on top
+            // of the phoneme tiles. Critical for drag-to-morph: if
+            // the .ph-bg circles were above, they'd intercept the
+            // pointerdown that should hit the draggable .path-stop.
+            // Populated by behavior.js; left empty here so JS doesn't
+            // have to mint the layer node.
+            g id="path-layer" class="path-layer" {}
         }
     }
 }

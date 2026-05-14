@@ -160,54 +160,33 @@ await check('selecting a phoneme mid-animation cancels the animation walk', asyn
   if (stillSelected !== 1) throw new Error(`expected /ʒ/ still .selected`);
 });
 
+/* `realDrag` uses locator.dragTo — the actual hit-tested drag a user
+ * would make. Synthetic dispatchEvent() bypasses hit-testing and
+ * would pass even if the path stop were buried under a phoneme tile
+ * (a real bug we previously shipped). */
+async function realDrag(fromSel, toSel) {
+  await page.locator(fromSel).dragTo(page.locator(toSel));
+  await page.waitForTimeout(200);
+}
+
 await check('drag a path stop from ɪ → i morphs ship into sheep', async () => {
-  // Load `ship` so the path is /ʃ ɪ p/.
   await page.click('.sample-chip[data-word="ship"]');
   await page.waitForTimeout(1500);
-  // Synthesize the drag via PointerEvents — playwright's native
-  // drag does not work well on SVG.
-  const result = await page.evaluate(async () => {
-    const stops = document.querySelectorAll('.path-stop');
-    const ipaStop = Array.from(stops).find(s => s.dataset.ch === 'ɪ');
-    const tile_i = document.querySelector('.ph[data-ch="i"]');
-    if (!ipaStop || !tile_i) return { error: 'missing nodes' };
-    const r = ipaStop.getBoundingClientRect();
-    const t = tile_i.getBoundingClientRect();
-    ipaStop.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, clientX:r.x+r.width/2, clientY:r.y+r.height/2, pointerId:1}));
-    document.dispatchEvent(new PointerEvent('pointermove', {bubbles:true, clientX:t.x+t.width/2, clientY:t.y+t.height/2, pointerId:1}));
-    document.dispatchEvent(new PointerEvent('pointerup',   {bubbles:true, clientX:t.x+t.width/2, clientY:t.y+t.height/2, pointerId:1}));
-    await new Promise(r => setTimeout(r, 200));
-    return {
-      word:   document.getElementById('word-glyph').textContent,
-      crumbVisible: document.getElementById('morph-breadcrumb').classList.contains('visible'),
-      crumbText:    document.getElementById('morph-reset').textContent,
-    };
-  });
-  if (result.word !== 'sheep') throw new Error(`expected 'sheep', got '${result.word}'`);
-  if (!result.crumbVisible)    throw new Error(`expected morph breadcrumb visible`);
-  if (result.crumbText !== 'ship') throw new Error(`crumb says '${result.crumbText}'`);
+  await realDrag('.path-stop[data-ch="ɪ"]', '.ph[data-ch="i"]');
+  const word = await page.locator('#word-glyph').textContent();
+  if (word !== 'sheep') throw new Error(`expected 'sheep', got '${word}'`);
+  const crumbVisible = await page.locator('#morph-breadcrumb.visible').count();
+  if (crumbVisible !== 1) throw new Error('expected morph breadcrumb visible');
+  const crumbText = await page.locator('#morph-reset').textContent();
+  if (crumbText !== 'ship') throw new Error(`crumb says '${crumbText}'`);
 });
 
 await check('dragging to a non-word surfaces the "no word" indicator', async () => {
-  // From `sheep` (the previous state) drag /ʃ/ → /ð/. /ð i p/ is
-  // not an English word; the no-word indicator should appear.
-  const result = await page.evaluate(async () => {
-    const stops = document.querySelectorAll('.path-stop');
-    const stop = Array.from(stops).find(s => s.dataset.ch === 'ʃ');
-    const tile = document.querySelector('.ph[data-ch="ð"]');
-    if (!stop || !tile) return { error: 'missing nodes' };
-    const r = stop.getBoundingClientRect();
-    const t = tile.getBoundingClientRect();
-    stop.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, clientX:r.x+r.width/2, clientY:r.y+r.height/2, pointerId:1}));
-    document.dispatchEvent(new PointerEvent('pointermove', {bubbles:true, clientX:t.x+t.width/2, clientY:t.y+t.height/2, pointerId:1}));
-    document.dispatchEvent(new PointerEvent('pointerup',   {bubbles:true, clientX:t.x+t.width/2, clientY:t.y+t.height/2, pointerId:1}));
-    await new Promise(r => setTimeout(r, 200));
-    return {
-      word: document.getElementById('word-glyph').textContent,
-      noWord: document.getElementById('morph-noword').classList.contains('visible'),
-    };
-  });
-  if (!result.noWord) throw new Error(`expected no-word indicator on /ðip/`);
+  // From the current state (sheep), drag /ʃ/ → /ð/. /ðip/ isn't a
+  // word.
+  await realDrag('.path-stop[data-ch="ʃ"]', '.ph[data-ch="ð"]');
+  const noWord = await page.locator('#morph-noword.visible').count();
+  if (noWord !== 1) throw new Error('expected no-word indicator visible');
 });
 
 if (errors.length) {
