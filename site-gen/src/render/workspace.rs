@@ -71,6 +71,20 @@ fn word_header() -> Markup {
                 span id="word-glyph" class="word-glyph serif" {}
                 span id="word-ipa" class="word-ipa ipa-font" {}
                 span id="word-rank" class="word-rank" {}
+                // Morph breadcrumb: when the user drags a path stop
+                // to a new phoneme and the resulting IPA is still a
+                // real English word, this announces the change. JS
+                // toggles `.visible` to show / hide.
+                span id="morph-breadcrumb" class="morph-breadcrumb" {
+                    span class="mb-arrow" { "↺" }
+                    " from "
+                    button id="morph-reset" class="morph-reset" type="button" {}
+                }
+                // "Not a word" indicator — shown when the dragged
+                // configuration doesn't spell any English word.
+                span id="morph-noword" class="morph-noword" {
+                    "no English word with these sounds"
+                }
             }
             // Hint line — replaces the old "fun fact" block but
             // appears in-flow with the header. Keeps copy nearby

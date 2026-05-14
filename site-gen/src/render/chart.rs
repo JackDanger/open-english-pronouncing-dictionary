@@ -88,6 +88,22 @@ fn chart_svg(chars: &BTreeSet<char>) -> Markup {
             role="img"
             aria-label="IPA chart with phonemes positioned by articulation" {
 
+            // SVG defs — arrow marker for the word-path direction
+            // hint. behavior.js applies marker-end to each segment
+            // so the user can see which phoneme follows which.
+            defs {
+                marker id="path-arrow"
+                       viewBox="0 0 6 6"
+                       refX="5"
+                       refY="3"
+                       markerWidth="3.6"
+                       markerHeight="3.6"
+                       markerUnits="userSpaceOnUse"
+                       orient="auto-start-reverse" {
+                    path d="M0 0 L6 3 L0 6 Z" fill="currentColor" {}
+                }
+            }
+
             (background_decoration())
 
             // Word-path overlay layer. Populated by behavior.js when

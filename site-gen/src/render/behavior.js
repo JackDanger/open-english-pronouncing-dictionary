@@ -52,21 +52,51 @@
 
   /* ── Workspace state ────────────────────────────────────────────
    *
-   *   selectedCh — phoneme the user has *clicked* on the chart.
-   *                Sticky: persists across hover and mouseleave.
-   *                When set, the sagittal stays on it and the chart
-   *                phoneme shows the `.selected` visual state.
+   *   selectedCh    — phoneme the user *clicked* on the chart.
+   *                   Sticky: persists across hover and mouseleave.
    *
-   *   lastStep   — the phoneme the most-recent word-path animation
-   *                ended on. When nothing is selected, this is what
-   *                the sagittal falls back to on mouseleave so the
-   *                inset never "snaps to nothing".
+   *   lastStep      — the phoneme the most-recent word-path step
+   *                   landed on; used as fallback when nothing is
+   *                   selected so the sagittal never snaps to nothing.
    *
-   *   The interaction model: hover *previews*, click *commits*.
-   *   Click again on the same phoneme to release.
+   *   currentPath   — the mutable phoneme sequence currently drawn
+   *                   on the chart. Drag-to-morph rewrites entries
+   *                   in place; redrawPath() rebuilds the SVG layer
+   *                   from this array. Each entry is {ch, x, y}.
+   *
+   *   originalWord  — the word the user started from. Stays put for
+   *                   the morph breadcrumb ("↺ from PNEUMONIA") so
+   *                   they can return at any time.
    */
-  let selectedCh = null;
-  let lastStep   = null;
+  let selectedCh   = null;
+  let lastStep     = null;
+  let currentPath  = [];
+  let originalWord = null;
+
+  /* ── Reverse IPA → words index ──────────────────────────────────
+   * Built once at script init. Drag-to-morph reads it on every snap
+   * to decide whether the current phoneme sequence spells a real
+   * English word. Stripped of stress / length marks since the chart
+   * doesn't represent those positions. */
+  const IPA_INDEX = new Map();
+  const STRIP_STRESS_RE = /[ˈˌːˑ]/g;
+  for (const [word, ipa] of WORDS) {
+    const key = ipa.replace(STRIP_STRESS_RE, '');
+    if (!IPA_INDEX.has(key)) IPA_INDEX.set(key, []);
+    IPA_INDEX.get(key).push({ word, ipa });
+  }
+
+  /* Phonemes that are *only* the first half of a diphthong pair in
+   * English. The path renderer thickens / curves the segment between
+   * such a phoneme and the next path stop, since they're a single
+   * articulatory glide rather than two independent moves. */
+  const DIPHTHONG_PAIRS = new Set([
+    'eɪ', 'aɪ', 'ɔɪ', 'oʊ', 'aʊ', 'ju',
+    'iə', 'ɛə', 'ʊə',
+  ]);
+  function isDiphthongPair(a, b) {
+    return DIPHTHONG_PAIRS.has(a + b);
+  }
 
   /* ── Helpers ────────────────────────────────────────────────── */
   function escHTML(s) {
@@ -265,73 +295,154 @@
     });
   }
 
-  /* ── Build phoneme path on the chart ────────────────────────── */
+  /* ── Coordinate math: chart_layout space ↔ SVG space ─────────── */
+  const VOWEL_TOP = 4, VOWEL_BOTTOM = 42, CONS_TOP = 56, CONS_BOTTOM = 96;
+  function chartCoordsFor(ch) {
+    const p = CHART_POS[ch];
+    if (!p) return null;
+    const [px, py, plane] = p;
+    const y = plane === 0
+      ? VOWEL_TOP + (py / 100) * (VOWEL_BOTTOM - VOWEL_TOP)
+      : CONS_TOP  + (py / 100) * (CONS_BOTTOM - CONS_TOP);
+    return { x: px, y, plane };
+  }
+  function planeForSvgY(y) {
+    // Anything above the gap between the two bands is "vowel zone",
+    // anything below is "consonant zone".
+    return y < (VOWEL_BOTTOM + CONS_TOP) / 2 ? 0 : 1;
+  }
+  function findNearestPhoneme(svgX, svgY, plane) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const [ch, [px, py, p]] of Object.entries(CHART_POS)) {
+      if (p !== plane) continue;
+      const c = chartCoordsFor(ch);
+      const dx = c.x - svgX;
+      const dy = c.y - svgY;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestDist) { bestDist = d2; best = ch; }
+    }
+    return best;
+  }
+  function screenToSvg(clientX, clientY) {
+    const pt = chartEl.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    const ctm = chartEl.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+    return pt.matrixTransform(ctm.inverse());
+  }
+
+  /* ── Build the phoneme path for a word's IPA ────────────────── */
   function chartPathFor(ipa) {
     const path = [];
     let order = 0;
     for (const ch of ipa) {
       if ('ˈˌːˑ'.includes(ch)) continue;
-      const p = CHART_POS[ch];
-      if (!p) continue;
-      // For chart drawing, transform consonant coords from chart_layout
-      // coordinate space (which uses 0..100 per axis split into vowel
-      // top / consonant bottom bands) to SVG y. Mirrors what
-      // render/chart.rs does in Rust.
-      const [px, py, plane] = p;
-      const VOWEL_TOP = 4, VOWEL_BOTTOM = 42, CONS_TOP = 56, CONS_BOTTOM = 96;
-      const y = plane === 0
-        ? VOWEL_TOP + (py / 100) * (VOWEL_BOTTOM - VOWEL_TOP)
-        : CONS_TOP  + (py / 100) * (CONS_BOTTOM - CONS_TOP);
-      path.push({ ch, x: px, y, order: ++order });
+      const c = chartCoordsFor(ch);
+      if (!c) continue;
+      path.push({ ch, x: c.x, y: c.y, plane: c.plane, order: ++order });
     }
     return path;
   }
 
-  /* ── Animate the path across the chart + sagittal inset ─────── */
-  async function animateWord(path) {
-    const token = ++animationToken;
-    // Clear the prior word's drawing — both the path strokes and the
-    // `.on-path` marker on every chart phoneme that was in it.
+  /* ── Path rendering: build SVG path + numbered draggable stops ─
+   *
+   * Two render paths:
+   *   - `redrawPath()` rebuilds the chart's path layer from
+   *     `currentPath` in one shot. Called after every mutation
+   *     (drag-snap, full word load post-animation).
+   *   - `animateWord(path)` is the initial draw — `redrawPath`
+   *     followed by the stroke-dashoffset reveal + sagittal walk.
+   *
+   * `currentPath` is the source of truth. Drag handlers mutate
+   * entries in place and call `redrawPath`. */
+  function clearPathLayer() {
     while (pathLayer.firstChild) pathLayer.removeChild(pathLayer.firstChild);
     chartEl.querySelectorAll('.ph.on-path').forEach(el => el.classList.remove('on-path'));
+  }
 
-    if (path.length === 0) { lastStep = null; return; }
+  /** Render the current path as a static (no animation) layer. */
+  function redrawPath() {
+    clearPathLayer();
+    if (currentPath.length === 0) return;
 
-    let d = `M ${path[0].x.toFixed(2)} ${path[0].y.toFixed(2)}`;
-    for (let i = 1; i < path.length; i++) {
-      d += ` L ${path[i].x.toFixed(2)} ${path[i].y.toFixed(2)}`;
+    // Build the underlying path with per-segment <line>s rather than
+    // a single <path d="M…L…L…">. Separate segments let us:
+    //   - apply marker-end (arrow) to each one independently
+    //   - tag diphthong glides with a different class
+    //   - keep stops sitting on top of the lines, not under them.
+    for (let i = 0; i < currentPath.length - 1; i++) {
+      const a = currentPath[i];
+      const b = currentPath[i + 1];
+      const cls = isDiphthongPair(a.ch, b.ch) ? 'word-seg diphthong' : 'word-seg';
+      const seg = ns('line', {
+        x1: a.x.toFixed(2), y1: a.y.toFixed(2),
+        x2: b.x.toFixed(2), y2: b.y.toFixed(2),
+        class: cls,
+        'marker-end': 'url(#path-arrow)',
+      });
+      pathLayer.appendChild(seg);
     }
-    const pathEl = ns('path', { d, class: 'word-path' });
-    pathLayer.appendChild(pathEl);
-    const totalLen = pathEl.getTotalLength();
-    pathEl.style.strokeDasharray = `${totalLen}`;
-    pathEl.style.strokeDashoffset = `${totalLen}`;
-    void pathEl.getBoundingClientRect();
-    const totalMs = Math.max(700, path.length * 220);
-    pathEl.style.transition = `stroke-dashoffset ${totalMs}ms cubic-bezier(.45,.05,.55,.95)`;
-    pathEl.style.strokeDashoffset = '0';
 
-    const perStep = Math.floor(totalMs / Math.max(path.length, 1));
-    for (let i = 0; i < path.length; i++) {
-      if (token !== animationToken) return;
-      const stop = path[i];
-      // Numbered, clickable badge at this stop. Carries data-ch +
-      // data-step so the delegated click handler can route to it.
+    // Draggable, numbered stop at each phoneme.
+    currentPath.forEach((stop, idx) => {
       const g = ns('g', {
         class: 'path-stop',
         'data-ch': stop.ch,
         'data-step': String(stop.order),
+        'data-idx': String(idx),
         transform: `translate(${stop.x.toFixed(2)} ${stop.y.toFixed(2)})`,
       });
-      g.appendChild(ns('circle', { r: 2.6, class: 'stop-bg' }));
+      g.appendChild(ns('circle', { r: 2.8, class: 'stop-bg' }));
       g.appendChild(ns('text',
         { 'text-anchor': 'middle', 'dominant-baseline': 'central', y: 0.4, class: 'stop-n' },
         String(stop.order)));
       pathLayer.appendChild(g);
+
       const glyph = chartEl.querySelector(`.ph[data-ch="${CSS.escape(stop.ch)}"]`);
       if (glyph) glyph.classList.add('on-path');
-      paintSagittal(stop.ch);
-      lastStep = stop.ch;
+    });
+  }
+
+  /** Initial draw for a freshly-selected word: redraw then animate. */
+  async function animateWord(path) {
+    const token = ++animationToken;
+    currentPath = path;
+    redrawPath();
+    if (path.length === 0) { lastStep = null; return; }
+
+    // Animate the line stroke-in. We don't have one single <path>
+    // anymore — each segment is its own <line>. Sum total length and
+    // animate each in turn.
+    const segs = pathLayer.querySelectorAll('.word-seg');
+    let totalLen = 0;
+    const segLens = [];
+    segs.forEach(s => {
+      const x1 = +s.getAttribute('x1'), y1 = +s.getAttribute('y1');
+      const x2 = +s.getAttribute('x2'), y2 = +s.getAttribute('y2');
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      segLens.push(len);
+      totalLen += len;
+      s.style.strokeDasharray = `${len}`;
+      s.style.strokeDashoffset = `${len}`;
+    });
+    void pathLayer.getBoundingClientRect();
+    const totalMs = Math.max(700, path.length * 220);
+    let elapsed = 0;
+    segs.forEach((s, i) => {
+      const segMs = (segLens[i] / Math.max(totalLen, 1)) * totalMs;
+      s.style.transition = `stroke-dashoffset ${segMs.toFixed(0)}ms cubic-bezier(.45,.05,.55,.95) ${elapsed.toFixed(0)}ms`;
+      s.style.strokeDashoffset = '0';
+      elapsed += segMs;
+    });
+
+    // Walk the sagittal in sync.
+    const perStep = Math.floor(totalMs / Math.max(path.length, 1));
+    for (let i = 0; i < path.length; i++) {
+      if (token !== animationToken) return;
+      paintSagittal(path[i].ch);
+      lastStep = path[i].ch;
       await sleep(perStep);
     }
   }
@@ -388,13 +499,15 @@
     wRank.textContent = '#' + (rankZeroIdx + 1) + ' by frequency';
     wHint.textContent = makeHint(word, ipa);
     renderSpellingBand(word, ipa);
-    // A new word resets the per-phoneme commitment — the user is
-    // now studying the word, not a specific phoneme.
+    // A new word resets the per-phoneme commitment AND the morph
+    // breadcrumb — the user is now studying this word, not riffing
+    // on something else.
     releaseSelection();
+    originalWord = word;
+    document.getElementById('morph-breadcrumb')?.classList.remove('visible');
+    document.getElementById('morph-noword')?.classList.remove('visible');
     const path = chartPathFor(ipa);
     animateWord(path);
-    // Surface the first phoneme on the sagittal immediately so a user
-    // who doesn't wait through the animation still sees something.
     if (path.length > 0) paintSagittal(path[0].ch);
   }
 
@@ -487,6 +600,113 @@
     lastStep = ch;
   }
 
+  /* ── Drag-to-morph ──────────────────────────────────────────────
+   *
+   * Each path stop is a draggable handle. While dragging, the stop
+   * snaps to the nearest phoneme *in its plane* (vowels stay in the
+   * vowel quadrilateral, consonants in the consonant grid). The
+   * current path's IPA is looked up after every snap; if the result
+   * is a real English word, the word header swaps to it. If not,
+   * the "no word" indicator surfaces.
+   *
+   * When the morph lands on a real word, that word becomes the new
+   * basis for further morphing — the user can keep dragging from
+   * there. The original word stays as a breadcrumb ("↺ from SHIP")
+   * so they can always return.
+   */
+  let dragState = null;
+  function onStopPointerDown(e, stopGroup) {
+    const idx = +stopGroup.dataset.idx;
+    if (!Number.isFinite(idx) || idx < 0 || idx >= currentPath.length) return;
+    e.preventDefault();
+    dragState = { idx, dragging: false };
+    stopGroup.setPointerCapture?.(e.pointerId);
+    stopGroup.classList.add('dragging');
+  }
+  function onStopPointerMove(e) {
+    if (!dragState) return;
+    const pt = screenToSvg(e.clientX, e.clientY);
+    const plane = currentPath[dragState.idx].plane;
+    const nearest = findNearestPhoneme(pt.x, pt.y, plane);
+    if (!nearest) return;
+    if (nearest === currentPath[dragState.idx].ch) {
+      dragState.dragging = true;
+      return;
+    }
+    dragState.dragging = true;
+    const c = chartCoordsFor(nearest);
+    currentPath[dragState.idx] = {
+      ...currentPath[dragState.idx],
+      ch: nearest,
+      x: c.x,
+      y: c.y,
+    };
+    redrawPath();
+    paintSagittal(nearest);
+    lastStep = nearest;
+    refreshWordFromPath();
+  }
+  function onStopPointerUp() {
+    if (!dragState) return;
+    const wasDragging = dragState.dragging;
+    dragState = null;
+    chartEl.querySelectorAll('.path-stop.dragging').forEach(el => el.classList.remove('dragging'));
+    // If the pointer never actually moved across a phoneme boundary,
+    // treat the gesture as a click-on-stop (existing focusPathStep
+    // behaviour). The standard `click` event still fires after
+    // pointerup, so we don't need to invoke it ourselves.
+    void wasDragging;
+  }
+
+  /** Recompute IPA from `currentPath`, look it up, and update the
+   *  word header / breadcrumb / "no word" indicator accordingly. */
+  function refreshWordFromPath() {
+    const ipa = currentPath.map(s => s.ch).join('');
+    const hits = IPA_INDEX.get(ipa);
+    const mbEl = document.getElementById('morph-breadcrumb');
+    const nwEl = document.getElementById('morph-noword');
+    const mbResetBtn = document.getElementById('morph-reset');
+
+    if (hits && hits.length) {
+      // We've landed on a real word. Show it as the current word.
+      const { word, ipa: fullIpa } = hits[0];
+      wGlyph.textContent = word;
+      wIpa.textContent = '/' + fullIpa + '/';
+      const i = WORDS.findIndex(w => w[0] === word);
+      wRank.textContent = i >= 0 ? '#' + (i + 1) + ' by frequency' : '';
+      wHint.textContent = makeHint(word, fullIpa);
+      renderSpellingBand(word, fullIpa);
+      nwEl.classList.remove('visible');
+      if (originalWord && originalWord !== word) {
+        mbResetBtn.textContent = originalWord;
+        mbEl.classList.add('visible');
+      } else {
+        mbEl.classList.remove('visible');
+      }
+    } else {
+      // Not in the corpus — show the phoneme sequence as-is, with a
+      // clear "this isn't a word" indicator. Spelling band clears.
+      wGlyph.textContent = '⟨—⟩';
+      wIpa.textContent = '/' + ipa + '/';
+      wRank.textContent = '';
+      wHint.textContent = '';
+      while (spellEl.firstChild) spellEl.removeChild(spellEl.firstChild);
+      nwEl.classList.add('visible');
+      if (originalWord) {
+        mbResetBtn.textContent = originalWord;
+        mbEl.classList.add('visible');
+      } else {
+        mbEl.classList.remove('visible');
+      }
+    }
+  }
+
+  function resetToOriginal() {
+    if (!originalWord) return;
+    const i = WORDS.findIndex(w => w[0] === originalWord);
+    if (i >= 0) selectWord(WORDS[i][0], WORDS[i][1], i);
+  }
+
   /* ── Reverse phoneme search ─────────────────────────────────── */
   function runReverseSearch() {
     if (!reverseQ) return;
@@ -521,6 +741,7 @@
   /* ── Delegated listeners ────────────────────────────────────── */
   document.addEventListener('click', (e) => {
     if (e.target.closest('#search-clear')) { clearAll(); return; }
+    if (e.target.closest('#morph-reset')) { e.preventDefault(); resetToOriginal(); return; }
     const wordEl = e.target.closest('[data-word]');
     if (wordEl) { e.preventDefault(); searchAndShow(wordEl.dataset.word); return; }
     const stopEl = e.target.closest('.path-stop[data-ch]');
@@ -529,14 +750,26 @@
     if (phEl) { e.preventDefault(); togglePhonemeSelection(phEl.dataset.ch); return; }
     // Click on chart background (anywhere in the chart svg that
     // isn't a phoneme tile or a path stop) clears any committed
-    // selection — same gesture as clicking on the underlying canvas
-    // in a typical map / diagram interaction.
+    // selection.
     if (e.target.closest('#ipa-chart')) {
       releaseSelection();
       return;
     }
     if (!e.target.closest('.word-picker')) hideSuggestions();
   });
+
+  // Drag-to-morph on path stops. Pointer events because SVG mouse
+  // drag is unreliable across browsers, and `setPointerCapture`
+  // handles pointer-leave-during-drag for free.
+  chartEl?.addEventListener('pointerdown', (e) => {
+    const stop = e.target.closest('.path-stop[data-idx]');
+    if (stop) onStopPointerDown(e, stop);
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (dragState) onStopPointerMove(e);
+  });
+  document.addEventListener('pointerup',     () => onStopPointerUp());
+  document.addEventListener('pointercancel', () => onStopPointerUp());
 
   // Hover on chart phonemes previews the sagittal — but only while
   // nothing is *committed* via click. With a selection, hovering
