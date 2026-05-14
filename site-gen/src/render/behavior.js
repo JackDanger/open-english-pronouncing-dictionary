@@ -625,6 +625,76 @@
    * so they can always return.
    */
   let dragState = null;
+
+  /** Compute morph-targets for a given path-stop index: every phoneme
+   * in the same plane that, if substituted into this slot, produces
+   * a real English word. Returns Map<char, word>. */
+  function computeMorphTargets(stopIdx) {
+    const targets = new Map();
+    const baseCh = currentPath[stopIdx].ch;
+    const plane  = currentPath[stopIdx].plane;
+    const chars = currentPath.map(s => s.ch);
+    for (const [ch, posArr] of Object.entries(CHART_POS)) {
+      const [, , p] = posArr;
+      if (p !== plane) continue;
+      if (ch === baseCh) continue;
+      chars[stopIdx] = ch;
+      const ipa = chars.join('');
+      const hits = IPA_INDEX.get(ipa);
+      if (hits && hits.length) targets.set(ch, hits[0].word);
+    }
+    chars[stopIdx] = baseCh; // (irrelevant; locals discarded)
+    return targets;
+  }
+
+  /** Light up the chart's morph-target tiles and append a small word
+   * label SVG to each. Also marks the original phoneme so the user
+   * has a clear "home" to snap back to. */
+  function lightMorphTargets(stopIdx, targets) {
+    const originalCh = currentPath[stopIdx].ch;
+    chartEl.classList.add('morphing');
+    // The original phoneme tile — show as a distinct "from" marker.
+    const orig = chartEl.querySelector(`.ph[data-ch="${CSS.escape(originalCh)}"]`);
+    if (orig) orig.classList.add('morph-origin');
+    // Every valid morph target gets its own label.
+    for (const [ch, word] of targets) {
+      const ph = chartEl.querySelector(`.ph[data-ch="${CSS.escape(ch)}"]`);
+      if (!ph) continue;
+      ph.classList.add('morph-target');
+      const label = ns('text', {
+        class: 'morph-label',
+        'text-anchor': 'middle',
+        y: '-5.2',                       // sits above the tile
+      }, word.length > 8 ? word.slice(0, 7) + '…' : word);
+      ph.appendChild(label);
+    }
+  }
+
+  function clearMorphTargets() {
+    chartEl.classList.remove('morphing');
+    chartEl.querySelectorAll('.ph.morph-origin').forEach(el => el.classList.remove('morph-origin'));
+    chartEl.querySelectorAll('.ph.morph-target').forEach(el => {
+      el.classList.remove('morph-target');
+      const label = el.querySelector('.morph-label');
+      if (label) label.remove();
+    });
+  }
+
+  /** Find the nearest phoneme amongst the snap-allowed set. The set
+   * always includes the original phoneme so the user can drag back. */
+  function findNearestMorphTarget(svgX, svgY, validSet) {
+    let best = null, bestDist = Infinity;
+    for (const ch of validSet) {
+      const c = chartCoordsFor(ch);
+      if (!c) continue;
+      const dx = c.x - svgX;
+      const dy = c.y - svgY;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestDist) { bestDist = d2; best = ch; }
+    }
+    return best;
+  }
+
   function onStopPointerDown(e, stopGroup) {
     const idx = +stopGroup.dataset.idx;
     if (!Number.isFinite(idx) || idx < 0 || idx >= currentPath.length) return;
@@ -632,15 +702,23 @@
     // Cancel any in-flight word animation so the sagittal walk
     // doesn't fight the user's drag for control.
     cancelAnimation();
-    dragState = { idx, dragging: false };
+    const targets    = computeMorphTargets(idx);
+    const originalCh = currentPath[idx].ch;
+    // Always allow snap to the original — gives the user an obvious
+    // "back to start" target during the drag.
+    const validSet = new Set([originalCh, ...targets.keys()]);
+    dragState = { idx, dragging: false, originalCh, targets, validSet };
     stopGroup.setPointerCapture?.(e.pointerId);
     stopGroup.classList.add('dragging');
+    lightMorphTargets(idx, targets);
   }
   function onStopPointerMove(e) {
     if (!dragState) return;
     const pt = screenToSvg(e.clientX, e.clientY);
-    const plane = currentPath[dragState.idx].plane;
-    const nearest = findNearestPhoneme(pt.x, pt.y, plane);
+    // Snap is filtered to the precomputed valid set (morph-target
+    // phonemes + the original) — never to a phoneme that wouldn't
+    // yield a real word. The interaction can't produce a non-word.
+    const nearest = findNearestMorphTarget(pt.x, pt.y, dragState.validSet);
     if (!nearest) return;
     if (nearest === currentPath[dragState.idx].ch) {
       dragState.dragging = true;
@@ -654,6 +732,10 @@
       x: c.x,
       y: c.y,
     };
+    // redrawPath only touches the path-layer and .on-path classes.
+    // .morph-target / .morph-origin / .morph-label all live on the
+    // phoneme tiles (siblings of path-layer) and survive across
+    // every snap during the drag.
     redrawPath();
     paintSagittal(nearest);
     lastStep = nearest;
@@ -661,14 +743,9 @@
   }
   function onStopPointerUp() {
     if (!dragState) return;
-    const wasDragging = dragState.dragging;
     dragState = null;
     chartEl.querySelectorAll('.path-stop.dragging').forEach(el => el.classList.remove('dragging'));
-    // If the pointer never actually moved across a phoneme boundary,
-    // treat the gesture as a click-on-stop (existing focusPathStep
-    // behaviour). The standard `click` event still fires after
-    // pointerup, so we don't need to invoke it ourselves.
-    void wasDragging;
+    clearMorphTargets();
   }
 
   /** Recompute IPA from `currentPath`, look it up, and update the

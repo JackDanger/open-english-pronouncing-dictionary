@@ -181,12 +181,47 @@ await check('drag a path stop from ɪ → i morphs ship into sheep', async () =>
   if (crumbText !== 'ship') throw new Error(`crumb says '${crumbText}'`);
 });
 
-await check('dragging to a non-word surfaces the "no word" indicator', async () => {
-  // From the current state (sheep), drag /ʃ/ → /ð/. /ðip/ isn't a
-  // word.
+await check('starting a drag lights up valid morph-target phonemes', async () => {
+  await page.click('.sample-chip[data-word="ship"]');
+  await page.waitForTimeout(1500);
+  // Begin a drag on /ʃ/ (a consonant with many minimal-pair
+  // neighbours — hip, sip, tip, …). Don't release; check the
+  // lit landscape.
+  const result = await page.evaluate(async () => {
+    const stop = Array.from(document.querySelectorAll('.path-stop')).find(s => s.dataset.ch === 'ʃ');
+    const r = stop.getBoundingClientRect();
+    stop.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true, clientX:r.x+r.width/2, clientY:r.y+r.height/2, pointerId:1 }));
+    await new Promise(r => setTimeout(r, 80));
+    const lit  = Array.from(document.querySelectorAll('.ph.morph-target')).map(el => el.dataset.ch);
+    const labels = Array.from(document.querySelectorAll('.morph-label')).map(el => el.textContent);
+    const origin = document.querySelector('.ph.morph-origin')?.dataset?.ch;
+    // Release without moving — should clear everything.
+    document.dispatchEvent(new PointerEvent('pointerup', { bubbles:true, pointerId:1 }));
+    await new Promise(r => setTimeout(r, 80));
+    const litAfter = document.querySelectorAll('.ph.morph-target').length;
+    return { lit, labels, origin, litAfter };
+  });
+  if (result.origin !== 'ʃ') throw new Error(`expected origin 'ʃ', got '${result.origin}'`);
+  if (result.lit.length < 5) throw new Error(`expected ≥5 lit moves, got ${result.lit.length}`);
+  if (!result.labels.some(l => l === 'hip' || l === 'sip' || l === 'tip')) {
+    throw new Error(`expected at least one common minimal-pair word in labels, saw ${result.labels.slice(0,5).join(', ')}`);
+  }
+  if (result.litAfter !== 0) throw new Error('lit state should clear on release');
+});
+
+await check('drag releases on a dim tile snap to a valid target instead', async () => {
+  // Try to drag /ʃ/ toward /ð/. /ðip/ isn't a word, so /ð/ isn't a
+  // lit target. The drag should snap to the nearest VALID target
+  // instead (whichever lit tile is closest to ð's chart position).
+  await page.click('.sample-chip[data-word="ship"]');
+  await page.waitForTimeout(1500);
   await realDrag('.path-stop[data-ch="ʃ"]', '.ph[data-ch="ð"]');
+  // The post-drag word must still be a real English word (i.e. the
+  // "no English word" indicator stays hidden).
   const noWord = await page.locator('#morph-noword.visible').count();
-  if (noWord !== 1) throw new Error('expected no-word indicator visible');
+  if (noWord !== 0) throw new Error('lit-moves drag should never land on a non-word');
+  const word = await page.locator('#word-glyph').textContent();
+  if (!word || word === '⟨—⟩') throw new Error(`expected a real word after drag, got '${word}'`);
 });
 
 if (errors.length) {

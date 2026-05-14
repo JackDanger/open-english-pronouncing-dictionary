@@ -336,6 +336,53 @@ body {
 }
 .ph.selected .ph-glyph { fill: #fff; font-weight: 700; }
 
+/* ── Lit moves ──────────────────────────────────────────────────────
+ *
+ * While the user is dragging a path stop, every phoneme that would
+ * produce a real English word lights up. Non-targets dim so the
+ * landscape of "possible moves" reads at a glance.
+ *
+ * State layering:
+ *   .morph-target  — a valid drop position (lights up)
+ *   .morph-origin  — where the stop was at drag-start (distinct mark)
+ *   .on-path       — where the stop currently is during the drag
+ *   .on-path WINS over .morph-target visually so the user can see
+ *   their current position even when it's a valid target.
+ */
+#ipa-chart.morphing .ph:not(.morph-target):not(.morph-origin):not(.on-path) .ph-bg {
+  opacity: .25;
+}
+#ipa-chart.morphing .ph:not(.morph-target):not(.morph-origin):not(.on-path) .ph-glyph {
+  opacity: .25;
+}
+.ph.morph-target .ph-bg {
+  fill: color-mix(in srgb, #16a34a 20%, white);
+  stroke: #16a34a;
+  stroke-width: .55;
+  r: 3.7;
+}
+.ph.morph-target .ph-glyph { fill: #166534; font-weight: 600; }
+.ph.morph-origin .ph-bg {
+  fill: #fff;
+  stroke: var(--b500);
+  stroke-width: .7;
+  stroke-dasharray: .7 .35;
+}
+.ph.morph-origin .ph-glyph { fill: var(--b700); }
+/* The word label hanging above each lit tile. Small enough to stack
+ * across the chart without colliding for most chart slots. */
+.morph-label {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 2.2px;
+  font-weight: 600;
+  fill: #166534;
+  pointer-events: none;
+  paint-order: stroke fill;
+  stroke: #fff;
+  stroke-width: .35;
+  stroke-linejoin: round;
+}
+
 /* Keyboard focus mirrors hover. */
 .ph:focus-visible { outline: none; }
 .ph:focus-visible .ph-bg {
