@@ -17,8 +17,6 @@ mod css;
 mod footer;
 mod hero;
 mod scripts;
-mod sources;
-mod stats_band;
 mod workspace;
 
 // Retired but kept around to ease bisecting; they're no longer
@@ -29,6 +27,8 @@ mod workspace;
 #[allow(dead_code)] mod reverse_search;
 #[allow(dead_code)] mod search;
 #[allow(dead_code)] mod showcase;
+#[allow(dead_code)] mod sources;
+#[allow(dead_code)] mod stats_band;
 
 /// Build the entire static page as one HTML document.
 pub fn html_doc(
@@ -57,9 +57,7 @@ pub fn html_doc(
             }
             body {
                 (hero::render(stats))
-                (stats_band::render(stats))
                 (workspace::render(stats))
-                (sources::render(stats))
                 (footer::render())
                 (scripts::render(stats, matrix, pairs))
             }

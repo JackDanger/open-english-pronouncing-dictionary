@@ -167,19 +167,20 @@ fn sample_strip() -> Markup {
     // Every sample is well inside the top-50k payload AND illustrates
     // some particular pedagogical feature: silent letters, digraphs,
     // diphthongs, vowel-pair minimal contrast, rhotic vowel, etc.
+    //
+    // `cat` is first because it's the easiest tutorial — three
+    // phonemes, every slot has a dense neighbourhood (bat/fat/hat,
+    // cot/cut/kit, can/cab/cap).
     let samples: &[&str] = &[
+        "cat",        // tutorial — many neighbours in every slot
+        "ship",       // minimal-pair partner of sheep
         "pneumonia",  // silent p (silent prefix)
-        "knee",       // silent k (silent prefix)
-        "thought",    // gh silent (in standard American), ɔ vowel
-        "though",     // gh silent and OW diphthong
-        "rhythm",     // no overt vowel letter — schwa hides in 'y'
-        "queue",      // most letters silent; just /kju/
-        "colonel",    // famous "weirdest English spelling"
-        "subtle",     // silent b mid-word
-        "ship",       // ɪ vs… (pairs with sheep)
-        "sheep",      // …i (minimal-pair partner of ship)
+        "knee",       // silent k
+        "thought",    // gh silent, ɔ vowel
+        "rhythm",     // no overt vowel letter
+        "queue",      // most letters silent
+        "colonel",    // weirdest English spelling
         "bird",       // ɝ rhotic vowel
-        "would",      // silent l, ʊ
     ];
     html! {
         div class="sample-strip" {
