@@ -136,25 +136,30 @@ fn sagittal_shell() -> Markup {
                 preserveAspectRatio="xMidYMid meet" {
                 // Tract outline (a rounded rectangle from cords to lips).
                 rect class="tract" x="6" y="20" width="98" height="40" rx="8" ry="8" {}
-                // Vocal-cord buzz indicator on the left.
+                // Vocal-cord indicator on the left. Static lines —
+                // the JS toggles a `.voiced` class on this group
+                // and a separate text label spells out which.
                 g id="cords" class="cords" transform="translate(10 40)" {
                     line x1="0" y1="-9" x2="0" y2="9" {}
                     line x1="3" y1="-9" x2="3" y2="9" {}
                     line x1="6" y1="-9" x2="6" y2="9" {}
                 }
-                // Tongue blob — position set via CSS custom props
-                // --tx and --ty driven by JS (0..1 each).
+                // Tongue blob.
                 ellipse id="tongue" class="tongue"
                         cx="50" cy="40" rx="14" ry="9" {}
-                // Lips on the right — a path whose `d` attribute
-                // changes per lip mode (spread / neutral / rounded /
-                // closed / lowerlip).
+                // Lips on the right — path d changes per lip mode.
                 path id="lips" class="lips" d="M104 24 Q108 40 104 56" {}
                 // Airflow arrow over the tongue.
                 path id="airflow" class="airflow" d="M16 22 Q60 14 100 22" {}
                 // Nasal escape channel — visible only for nasals.
                 path id="nasal-path" class="nasal-path"
                      d="M70 20 Q70 8 90 8 Q104 8 104 14" {}
+                // Voicing label sitting under the cords. JS sets it
+                // to "voiced" or "voiceless" — replaces the previous
+                // bouncing-bars-only cue that was opaque to anyone
+                // who hadn't already learned what voicing was.
+                text id="cords-label" class="cords-label"
+                     x="9" y="74" text-anchor="middle" {}
             }
             p id="sagittal-desc" class="sagittal-desc" {}
         }

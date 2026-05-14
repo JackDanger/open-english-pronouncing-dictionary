@@ -71,7 +71,7 @@ await check('initial featured word populates the header', async () => {
 });
 
 await check('initial word draws a chart path', async () => {
-  const stops = await page.locator('#path-layer .path-stop').count();
+  const stops = await page.locator('#ipa-chart .ph.on-path').count();
   if (stops < 2) throw new Error(`expected ≥2 path stops, got ${stops}`);
 });
 
@@ -90,7 +90,7 @@ await check('typing a word into search updates everything', async () => {
   await page.waitForTimeout(2000);
   const w = await page.locator('#word-glyph').textContent();
   if (w !== 'pneumonia') throw new Error(`expected 'pneumonia', got '${w}'`);
-  const stops = await page.locator('#path-layer .path-stop').count();
+  const stops = await page.locator('#ipa-chart .ph.on-path').count();
   if (stops < 5) throw new Error(`expected ≥5 stops for pneumonia, got ${stops}`);
 });
 
@@ -166,10 +166,13 @@ async function realDrag(fromSel, toSel) {
   await page.waitForTimeout(200);
 }
 
-await check('drag a path stop from ɪ → i morphs ship into sheep', async () => {
+await check('drag the ɪ tile (on-path) → i morphs ship into sheep', async () => {
   await page.click('.sample-chip[data-word="ship"]');
   await page.waitForTimeout(1500);
-  await realDrag('.path-stop[data-ch="ɪ"]', '.ph[data-ch="i"]');
+  // The on-path tile is the drag handle now (numbered badges were
+  // removed — they occluded the phoneme glyph). The locator picks
+  // the specific .ph that has the .on-path marker.
+  await realDrag('#ipa-chart .ph.on-path[data-ch="ɪ"]', '.ph[data-ch="i"]');
   const word = await page.locator('#word-glyph').textContent();
   if (word !== 'sheep') throw new Error(`expected 'sheep', got '${word}'`);
   const crumbVisible = await page.locator('#morph-breadcrumb.visible').count();
@@ -181,9 +184,9 @@ await check('drag a path stop from ɪ → i morphs ship into sheep', async () =>
 await check('clicking a path stop lights up valid morph-target phonemes (sticky)', async () => {
   await page.click('.sample-chip[data-word="ship"]');
   await page.waitForTimeout(1500);
-  // Click /ʃ/ stop. Lit state must appear AND persist (not flicker
-  // out on pointerup — sticky morph mode).
-  await page.click('.path-stop[data-ch="ʃ"]');
+  // Click the on-path /ʃ/ tile. Lit state must appear AND persist
+  // (sticky morph mode — pointerup no longer clears it).
+  await page.click('#ipa-chart .ph.on-path[data-ch="ʃ"]');
   await page.waitForTimeout(200);
   const result = await page.evaluate(() => ({
     lit:    Array.from(document.querySelectorAll('.ph.morph-target')).map(el => el.dataset.ch),
@@ -222,11 +225,10 @@ await check('clicking chart background exits sticky morph mode', async () => {
 
 await check('drag releases on a dim tile snap to a valid target instead', async () => {
   // Try to drag /ʃ/ toward /ð/. /ðip/ isn't a word, so /ð/ isn't a
-  // lit target. The drag should snap to the nearest VALID target
-  // instead (whichever lit tile is closest to ð's chart position).
+  // lit target. The drag should snap to the nearest VALID target.
   await page.click('.sample-chip[data-word="ship"]');
   await page.waitForTimeout(1500);
-  await realDrag('.path-stop[data-ch="ʃ"]', '.ph[data-ch="ð"]');
+  await realDrag('#ipa-chart .ph.on-path[data-ch="ʃ"]', '.ph[data-ch="ð"]');
   // The post-drag word must still be a real English word (i.e. the
   // "no English word" indicator stays hidden).
   const noWord = await page.locator('#morph-noword.visible').count();

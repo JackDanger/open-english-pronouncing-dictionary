@@ -181,11 +181,16 @@ pub fn voiced(ch: char) -> bool {
 /// Voiced / voiceless pair offset so chart cells with both members
 /// (e.g. /p/ and /b/) render side by side instead of on top of each
 /// other. Returns an x-axis offset in chart units.
+///
+/// Tile radius is 3.4 viewBox units, so to guarantee zero overlap
+/// the pair has to be ≥ 6.8 units apart. ±4 gives 8 units, enough
+/// gap that the two tiles read as clearly separate but still in
+/// the same column.
 pub fn voicing_offset(ch: char) -> f32 {
     if voiced(ch) && matches!(ch, 'b' | 'd' | 'ɡ' | 'g' | 'v' | 'ð' | 'z' | 'ʒ' | 'ʤ' | 'ɣ') {
-        2.5
+        4.0
     } else if matches!(ch, 'p' | 't' | 'k' | 'f' | 'θ' | 's' | 'ʃ' | 'ʧ' | 'x') {
-        -2.5
+        -4.0
     } else {
         0.0
     }
