@@ -39,6 +39,7 @@
   const lips      = document.getElementById('lips');
   const airflow   = document.getElementById('airflow');
   const cords     = document.getElementById('cords');
+  const cordsLabel= document.getElementById('cords-label');
   const nasalPath = document.getElementById('nasal-path');
   const reverseQ  = document.getElementById('reverse-q');
   const reverseR  = document.getElementById('reverse-results');
@@ -256,49 +257,70 @@
     return pieces;
   }
 
-  /* ── Draw the spelling band ─────────────────────────────────── */
+  /* ── Draw the spelling band ──────────────────────────────────
+   * Each non-silent column is tagged with `data-step="N"` so that
+   * the chart-path animation can light up the matching column in
+   * sync. The chart's step-N phoneme corresponds to the spelling
+   * band's step-N letters → sound pair. */
   function renderSpellingBand(word, ipa) {
     while (spellEl.firstChild) spellEl.removeChild(spellEl.firstChild);
     const pieces = alignSpelling(word, ipa);
     if (!pieces.length) return;
     const COLS = pieces.length;
     const colW = 100 / COLS;
+    let stepIdx = -1;
     pieces.forEach((p, i) => {
       const cx = (i + 0.5) * colW;
-      // Letters row at y=6.
+      // Tagged columns let the chart-path animation highlight the
+      // corresponding letters / sound in sync. Silent pieces have
+      // no chart counterpart, so they don't get a step.
+      const isChartStep = p.kind !== 'silent';
+      if (isChartStep) stepIdx++;
+      const stepAttr = isChartStep ? { 'data-step': String(stepIdx) } : {};
+
+      // Letters row.
       const lettersText = p.kind === 'digraph' ? p.letters
                        : (p.kind === 'silent' || p.kind === 'direct') ? p.letter
-                       : '·';      // inserted phoneme: no letter source
+                       : '·';
       const lcls = p.kind === 'silent' ? 'sb-letter silent'
                  : p.kind === 'digraph' ? 'sb-letter digraph'
                  : p.kind === 'insert' ? 'sb-letter insert'
                  : 'sb-letter';
       spellEl.appendChild(ns('text',
-        { x: cx, y: 7, 'text-anchor': 'middle', class: lcls }, lettersText));
+        { x: cx, y: 7, 'text-anchor': 'middle', class: lcls, ...stepAttr },
+        lettersText));
 
-      // Phonemes row at y=22.
+      // Phonemes row.
       const pText = p.kind === 'silent' ? ''
                   : (p.kind === 'direct' || p.kind === 'insert') ? p.phoneme
                   : p.phoneme;
       if (pText) {
         spellEl.appendChild(ns('text',
-          { x: cx, y: 23, 'text-anchor': 'middle', class: 'sb-phoneme ipa-font' }, pText));
+          { x: cx, y: 23, 'text-anchor': 'middle', class: 'sb-phoneme ipa-font', ...stepAttr },
+          pText));
       }
 
       // Connection line.
       if (p.kind === 'direct' || p.kind === 'digraph') {
         spellEl.appendChild(ns('line',
-          { x1: cx, y1: 10, x2: cx, y2: 19, class: 'sb-link' }));
+          { x1: cx, y1: 10, x2: cx, y2: 19, class: 'sb-link', ...stepAttr }));
       } else if (p.kind === 'silent') {
-        // dangling — a short stub to indicate "no sound"
         spellEl.appendChild(ns('line',
           { x1: cx, y1: 10, x2: cx, y2: 13, class: 'sb-link silent' }));
       } else if (p.kind === 'insert') {
-        // inserted phoneme: dotted line up to a stand-in dot
         spellEl.appendChild(ns('line',
-          { x1: cx, y1: 16, x2: cx, y2: 19, class: 'sb-link insert' }));
+          { x1: cx, y1: 16, x2: cx, y2: 19, class: 'sb-link insert', ...stepAttr }));
       }
     });
+  }
+
+  /** Highlight the spelling-band column matching chart-step N.
+   * Clears any prior active column first; passing -1 clears all. */
+  function highlightSpellStep(stepIdx) {
+    spellEl.querySelectorAll('.sb-active').forEach(el => el.classList.remove('sb-active'));
+    if (stepIdx < 0) return;
+    spellEl.querySelectorAll(`[data-step="${stepIdx}"]`).forEach(el =>
+      el.classList.add('sb-active'));
   }
 
   /* ── Coordinate math: chart_layout space ↔ SVG space ─────────── */
@@ -365,7 +387,10 @@
    * entries in place and call `redrawPath`. */
   function clearPathLayer() {
     while (pathLayer.firstChild) pathLayer.removeChild(pathLayer.firstChild);
-    chartEl.querySelectorAll('.ph.on-path').forEach(el => el.classList.remove('on-path'));
+    chartEl.querySelectorAll('.ph.on-path').forEach(el => {
+      el.classList.remove('on-path');
+      delete el.dataset.step;
+    });
   }
 
   /** Render the current path as a static (no animation) layer. */
@@ -373,11 +398,10 @@
     clearPathLayer();
     if (currentPath.length === 0) return;
 
-    // Build the underlying path with per-segment <line>s rather than
-    // a single <path d="M…L…L…">. Separate segments let us:
-    //   - apply marker-end (arrow) to each one independently
-    //   - tag diphthong glides with a different class
-    //   - keep stops sitting on top of the lines, not under them.
+    // Path segments between consecutive phoneme tiles. Arrows on
+    // each segment make direction unambiguous; a CSS marching-
+    // ants animation (gated on .morphing) gives subtle motion when
+    // the user is exploring.
     for (let i = 0; i < currentPath.length - 1; i++) {
       const a = currentPath[i];
       const b = currentPath[i + 1];
@@ -391,23 +415,17 @@
       pathLayer.appendChild(seg);
     }
 
-    // Draggable, numbered stop at each phoneme.
+    // No numbered badges — they used to sit on top of the phoneme
+    // tiles and occlude the glyph. The `.on-path` class on the tile
+    // itself is the marker; arrows on the segments convey order.
+    // The tile carries `data-step` so clicks on it can route to the
+    // right path index for morph mode.
     currentPath.forEach((stop, idx) => {
-      const g = ns('g', {
-        class: 'path-stop',
-        'data-ch': stop.ch,
-        'data-step': String(stop.order),
-        'data-idx': String(idx),
-        transform: `translate(${stop.x.toFixed(2)} ${stop.y.toFixed(2)})`,
-      });
-      g.appendChild(ns('circle', { r: 2.8, class: 'stop-bg' }));
-      g.appendChild(ns('text',
-        { 'text-anchor': 'middle', 'dominant-baseline': 'central', y: 0.4, class: 'stop-n' },
-        String(stop.order)));
-      pathLayer.appendChild(g);
-
       const glyph = chartEl.querySelector(`.ph[data-ch="${CSS.escape(stop.ch)}"]`);
-      if (glyph) glyph.classList.add('on-path');
+      if (glyph) {
+        glyph.classList.add('on-path');
+        glyph.dataset.step = String(idx);
+      }
     });
   }
 
@@ -443,14 +461,20 @@
       elapsed += segMs;
     });
 
-    // Walk the sagittal in sync.
+    // Walk the sagittal AND highlight the matching spelling-band
+    // column at each step. The user sees the letters / sound pair
+    // light up at the same moment the chart marker reaches that
+    // phoneme — same lesson, two views, in lockstep.
     const perStep = Math.floor(totalMs / Math.max(path.length, 1));
     for (let i = 0; i < path.length; i++) {
       if (token !== animationToken) return;
       paintSagittal(path[i].ch);
+      highlightSpellStep(i);
       lastStep = path[i].ch;
       await sleep(perStep);
     }
+    // After the walk, leave the last step lit on both views so the
+    // user can read it without it flashing away.
   }
 
   /* ── Sagittal inset driver ──────────────────────────────────── */
@@ -476,8 +500,12 @@
     };
     lips.setAttribute('d', lipPaths[spec.lips] || lipPaths.neutral);
     lips.setAttribute('class', `lips lips-${spec.lips}`);
-    // Voicing — class on the cords group; CSS animates the buzz.
+    // Voicing — class on the cords group + a clear text label
+    // underneath. The label is what makes "voiced / voiceless"
+    // legible to anyone who hasn't already learned the term; the
+    // colour of the cords gives a second cue.
     cords.setAttribute('class', spec.voiced ? 'cords voiced' : 'cords');
+    if (cordsLabel) cordsLabel.textContent = spec.voiced ? 'voiced' : 'voiceless';
     // Airflow path & class — CSS varies stroke style by mode.
     airflow.setAttribute('class', `airflow air-${spec.air}`);
     // Nasal channel — only visible for nasals.
@@ -740,7 +768,8 @@
   }
 
   function onStopPointerDown(e, stopGroup) {
-    const idx = +stopGroup.dataset.idx;
+    // stopGroup is now an on-path .ph tile carrying data-step.
+    const idx = +stopGroup.dataset.step;
     if (!Number.isFinite(idx) || idx < 0 || idx >= currentPath.length) return;
     e.preventDefault();
     cancelAnimation();
@@ -749,7 +778,10 @@
     const validSet   = new Set([originalCh, ...targets.keys()]);
     dragState = { idx, dragging: false, originalCh, targets, validSet };
     stopGroup.setPointerCapture?.(e.pointerId);
-    stopGroup.classList.add('dragging');
+    // The .ph tile being dragged migrates to the snap-target on
+    // each move, so we don't put a `.dragging` class on it (it'd
+    // get cleared by redrawPath). Drag-feedback is the cursor and
+    // the lit-target visuals.
     // Sticky morph mode tracks this stop. enterMorphMode is
     // idempotent if we're already on this idx, so the subsequent
     // click event doesn't flicker. The lit state persists across
@@ -788,7 +820,7 @@
   function onStopPointerUp() {
     if (!dragState) return;
     dragState = null;
-    chartEl.querySelectorAll('.path-stop.dragging').forEach(el => el.classList.remove('dragging'));
+    chartEl.querySelectorAll('.ph.dragging').forEach(el => el.classList.remove('dragging'));
     // Morph mode stays lit — the user can continue tapping lit
     // tiles to chain morphs. clearMorphTargets fires via
     // exitMorphMode when the user actively dismisses.
@@ -892,25 +924,25 @@
       }
     }
 
-    // Clicking a numbered path-stop enters sticky morph-mode AND
-    // focuses the sagittal on that phoneme. The lit landscape stays
-    // visible until the user dismisses it (click background, load a
-    // new word, click the same stop again).
-    const stopEl = e.target.closest('.path-stop[data-ch]');
-    if (stopEl) {
+    // Clicking an on-path tile enters sticky morph-mode for its
+    // step index AND focuses the sagittal. (Previously the numbered
+    // badges did this — they were removed because they occluded the
+    // phoneme glyph. The tile itself is the affordance now.)
+    const onPathEl = e.target.closest('.ph.on-path[data-step]');
+    if (onPathEl) {
       e.preventDefault();
-      const idx = +stopEl.dataset.idx;
-      focusPathStep(stopEl.dataset.ch);
+      const idx = +onPathEl.dataset.step;
+      focusPathStep(onPathEl.dataset.ch);
       enterMorphMode(idx);
       return;
     }
 
-    // Outside morph-mode, clicking a chart phoneme tile toggles
-    // "study this sound" selection (the older affordance).
+    // Outside morph-mode, clicking a non-path chart phoneme tile
+    // toggles "study this sound" selection.
     const phEl = e.target.closest('.ph[data-ch]');
     if (phEl) {
       e.preventDefault();
-      if (morphModeIdx !== null) exitMorphMode();  // user clicked a non-target tile
+      if (morphModeIdx !== null) exitMorphMode();
       togglePhonemeSelection(phEl.dataset.ch);
       return;
     }
@@ -924,12 +956,11 @@
     if (!e.target.closest('.word-picker')) hideSuggestions();
   });
 
-  // Drag-to-morph on path stops. Pointer events because SVG mouse
-  // drag is unreliable across browsers, and `setPointerCapture`
-  // handles pointer-leave-during-drag for free.
+  // Drag-to-morph: pointerdown on any on-path phoneme tile starts a
+  // drag for that step's index.
   chartEl?.addEventListener('pointerdown', (e) => {
-    const stop = e.target.closest('.path-stop[data-idx]');
-    if (stop) onStopPointerDown(e, stop);
+    const tile = e.target.closest('.ph.on-path[data-step]');
+    if (tile) onStopPointerDown(e, tile);
   });
   document.addEventListener('pointermove', (e) => {
     if (dragState) onStopPointerMove(e);

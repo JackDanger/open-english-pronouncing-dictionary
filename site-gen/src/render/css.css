@@ -228,6 +228,7 @@ body {
 .sb-letter {
   font-family: 'Playfair Display', serif; font-size: 4.5px;
   fill: var(--b800);
+  transition: fill .15s, font-weight .15s;
 }
 .sb-letter.digraph { fill: var(--b700); font-weight: 700; }
 .sb-letter.silent  { fill: #b5959e; font-style: italic; }
@@ -235,10 +236,18 @@ body {
 .sb-phoneme {
   font-size: 4.5px;
   fill: #555;
+  transition: fill .15s, font-weight .15s;
 }
-.sb-link    { stroke: var(--b400); stroke-width: .25; opacity: .6; }
+.sb-link    { stroke: var(--b400); stroke-width: .25; opacity: .6; transition: stroke-width .15s, opacity .15s; }
 .sb-link.silent  { stroke: #b5959e; stroke-dasharray: .4 .4; }
 .sb-link.insert  { stroke: #b5959e; stroke-dasharray: .3 .3; }
+
+/* Active spell-step: the chart's path animation lights up the
+ * matching letters-→-sound column here so the user sees the same
+ * lesson from both views simultaneously. */
+.sb-letter.sb-active  { fill: var(--b900); font-weight: 700; }
+.sb-phoneme.sb-active { fill: var(--b700); font-weight: 700; }
+.sb-link.sb-active    { stroke: var(--b700); stroke-width: .5; opacity: 1; }
 .spelling-legend {
   display: flex; flex-wrap: wrap; gap: .65rem; align-items: center;
   font-size: .7rem; color: #9c8a8e; padding-top: .25rem;
@@ -421,36 +430,23 @@ body {
   opacity: .8;
 }
 
-.path-stop {
-  cursor: grab;
-  touch-action: none;   /* keep drag gesture from page-scrolling */
+/* Marching-ants animation on segments when the chart is "active"
+ * (the user has entered morph mode). Subtle directional flow makes
+ * "the word goes this way" legible without anyone reading numbered
+ * badges. Static when idle so the page doesn't pulse. */
+#ipa-chart.morphing .path-layer .word-seg {
+  stroke-dasharray: 1.6 .9;
+  animation: marchingAnts 1.6s linear infinite;
 }
-.path-stop.dragging { cursor: grabbing; }
-.path-stop .stop-bg {
-  fill: var(--b700);
-  stroke: #fff;
-  stroke-width: .5;
-  /* Grow via `r` rather than CSS transform — see the .ph-bg note
-   * above. Same transform-origin browser quirk applies to the stop
-   * group's children.  */
-  transition: fill .15s, r .15s;
+@keyframes marchingAnts {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -2.5; }
 }
-.path-stop:hover .stop-bg {
-  fill: var(--b500);
-  r: 3.4;
-}
-.path-stop.dragging .stop-bg {
-  fill: var(--b400);
-  r: 3.7;
-  filter: drop-shadow(0 0 2px var(--b500));
-}
-.path-stop .stop-n {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 2.6px;
-  font-weight: 700;
-  fill: #fff;
-  pointer-events: none;
-}
+
+/* The .ph.on-path tile carries data-step so it's a click target for
+ * morph mode (the old numbered .path-stop badges used to live in
+ * the path-layer; they occluded the phoneme glyph and are gone). */
+.ph.on-path { cursor: pointer; }
 
 /* ── Sagittal / vocal-tract inset ──────────────────────────────────── */
 .sagittal-wrap {
@@ -473,16 +469,25 @@ body {
 }
 #sagittal .tract { fill: rgba(255,225,210,.55); stroke: var(--b400); stroke-width: .6; }
 #sagittal .cords line {
-  stroke: var(--b700);
+  stroke: #b5959e;
   stroke-width: 1.4;
   stroke-linecap: round;
-  opacity: .8;
+  opacity: .7;
 }
-#sagittal .cords.voiced line { animation: cordBuzz .25s linear infinite; }
-@keyframes cordBuzz {
-  0%   { transform: translateY(0); }
-  50%  { transform: translateY(1px); }
-  100% { transform: translateY(0); }
+/* Voiced phonemes paint the cord lines wine — a static colour cue
+ * rather than the previous bouncing animation, which read as
+ * unexplained noise to anyone not already taught what voicing is.
+ * The "voiced" / "voiceless" text label underneath spells the
+ * concept out explicitly. */
+#sagittal .cords.voiced line {
+  stroke: var(--b700);
+  opacity: 1;
+}
+#sagittal .cords-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 4px;
+  fill: #8a7070;
+  letter-spacing: .05em;
 }
 #sagittal .tongue {
   fill: #c4718a;
