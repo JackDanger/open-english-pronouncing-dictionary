@@ -145,6 +145,21 @@ await check('reverse search returns matches', async () => {
   if (!/match/.test(count)) throw new Error(`unexpected count: '${count}'`);
 });
 
+await check('selecting a phoneme mid-animation cancels the animation walk', async () => {
+  // Pick a long word so the path animation takes a while, then click
+  // a chart phoneme almost immediately. The user's click must win:
+  // selectedCh stays put and the sagittal isn't clobbered by the
+  // tail of the animation.
+  await page.fill('#q', 'phonetics');
+  await page.waitForTimeout(100);  // animation just started
+  await page.click('#ipa-chart .ph[data-ch="ʒ"]');
+  await page.waitForTimeout(2500); // well past the animation's normal duration
+  const glyph = await page.locator('#sagittal-glyph').textContent();
+  if (glyph !== 'ʒ') throw new Error(`expected sagittal still on 'ʒ' after animation finishes, got '${glyph}'`);
+  const stillSelected = await page.locator('#ipa-chart .ph.selected[data-ch="ʒ"]').count();
+  if (stillSelected !== 1) throw new Error(`expected /ʒ/ still .selected`);
+});
+
 await check('drag a path stop from ɪ → i morphs ship into sheep', async () => {
   // Load `ship` so the path is /ʃ ɪ p/.
   await page.click('.sample-chip[data-word="ship"]');

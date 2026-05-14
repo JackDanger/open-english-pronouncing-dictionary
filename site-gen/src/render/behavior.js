@@ -50,6 +50,12 @@
   let reverseDebounce = null;
   let animationToken = 0;   // monotonic id; cancels old animations
 
+  /** Bump the animation token so any in-flight walk-the-sagittal
+   * loop bails on its next iteration. Called whenever the user does
+   * something that should take precedence over the running word
+   * animation (selecting a phoneme, dragging, loading another word). */
+  function cancelAnimation() { animationToken++; }
+
   /* ── Workspace state ────────────────────────────────────────────
    *
    *   selectedCh    — phoneme the user *clicked* on the chart.
@@ -570,6 +576,10 @@
     paintSagittal(ch);
   }
   function togglePhonemeSelection(ch) {
+    // Any in-flight word animation should defer to the user's
+    // explicit click — otherwise the animation's next paintSagittal
+    // call would clobber what the user just selected.
+    cancelAnimation();
     if (selectedCh === ch) {
       releaseSelection();
       return;
@@ -619,6 +629,9 @@
     const idx = +stopGroup.dataset.idx;
     if (!Number.isFinite(idx) || idx < 0 || idx >= currentPath.length) return;
     e.preventDefault();
+    // Cancel any in-flight word animation so the sagittal walk
+    // doesn't fight the user's drag for control.
+    cancelAnimation();
     dragState = { idx, dragging: false };
     stopGroup.setPointerCapture?.(e.pointerId);
     stopGroup.classList.add('dragging');
